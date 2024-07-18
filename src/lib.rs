@@ -219,6 +219,8 @@ pub fn verify_safrole() -> bool {
 
     // Prover signs some data.
     let ring_signature = prover.ring_vrf_sign(vrf_input_data, aux_data);
+    // TODO [ToDr] ^^^ above fails because it requires randomness. Make the signature
+    // part of the function arguments.
 
     // Verifier checks it without knowing who is the signer.
     let ring_vrf_output = verifier.ring_vrf_verify(vrf_input_data, aux_data, &ring_signature).unwrap();
