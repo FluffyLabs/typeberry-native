@@ -46,6 +46,7 @@ dependencies = [
 [[package]]
 name = "ark-ec-vrfs"
 version = "0.1.0"
+source = "git+https://github.com/davxy/ark-ec-vrfs.git?rev=e868d1281d936716b84eb133960ecd51ff1e6633#e868d1281d936716b84eb133960ecd51ff1e6633"
 dependencies = [
  "ark-bls12-381",
  "ark-ec",
@@ -218,7 +219,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "common"
 version = "0.1.0"
-source = "git+https://github.com/davxy/ring-proof?rev=ed97adf50c0fcac04b2e66b4069166f1cca742c3#ed97adf50c0fcac04b2e66b4069166f1cca742c3"
+source = "git+https://www.github.com/davxy/ring-proof.git?rev=ed97adf50c0fcac04b2e66b4069166f1cca742c3#ed97adf50c0fcac04b2e66b4069166f1cca742c3"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -463,7 +464,7 @@ checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 [[package]]
 name = "ring"
 version = "0.1.0"
-source = "git+https://github.com/davxy/ring-proof?rev=ed97adf50c0fcac04b2e66b4069166f1cca742c3#ed97adf50c0fcac04b2e66b4069166f1cca742c3"
+source = "git+https://www.github.com/davxy/ring-proof.git?rev=ed97adf50c0fcac04b2e66b4069166f1cca742c3#ed97adf50c0fcac04b2e66b4069166f1cca742c3"
 dependencies = [
  "ark-ec",
  "ark-ff",
