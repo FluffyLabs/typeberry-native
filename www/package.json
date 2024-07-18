@@ -1,0 +1,14 @@
+{
+  "name": "bandersnatch-wasm-test",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "npx parcel-bundler serve index.html"
+  },
+  "dependencies": {
+    "bandersnatch-wasm": "file:../pkg"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
