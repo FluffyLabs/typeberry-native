@@ -169,10 +169,10 @@ impl From<ShardsCollection> for RsShardsCollection {
 
 fn rs_encode(
     recovery_count: usize,
-    shard_bytes: usize, // TODO [ToDr] is this the same as `shards.shard_len`?
     shards: RsShardsCollection,
 ) -> Result<RsShardsCollection, Error> {
-    let mut encoder = ReedSolomonEncoder::new(shards.length, recovery_count, shard_bytes)?;
+    let mut encoder =
+        ReedSolomonEncoder::new(shards.length, recovery_count, shards.shard_len.into())?;
 
     for i in 0..shards.length {
         assert!(
@@ -203,10 +203,10 @@ fn rs_encode(
 fn rs_decode(
     original_count: usize,
     recovery_count: usize,
-    shard_bytes: usize,
     shards: RsShardsCollection,
 ) -> Result<RsShardsCollection, Error> {
-    let mut decoder = ReedSolomonDecoder::new(original_count, recovery_count, shard_bytes)?;
+    let mut decoder =
+        ReedSolomonDecoder::new(original_count, recovery_count, shards.shard_len.into())?;
 
     for i in 0..shards.length {
         let idx = shards.chunk_index_at(i) as usize;
@@ -236,13 +236,8 @@ fn rs_decode(
 }
 
 #[wasm_bindgen]
-pub fn encode(
-    recovery_count: u16,
-    shard_bytes: u16,
-    shards: ShardsCollection,
-) -> Result<ShardsCollection, String> {
-    let result = rs_encode(recovery_count as usize, shard_bytes as usize, shards.into())
-        .map_err(|e| e.to_string())?;
+pub fn encode(recovery_count: u16, shards: ShardsCollection) -> Result<ShardsCollection, String> {
+    let result = rs_encode(recovery_count as usize, shards.into()).map_err(|e| e.to_string())?;
 
     Ok(result.into())
 }
@@ -251,13 +246,11 @@ pub fn encode(
 pub fn decode(
     original_count: u16,
     recovery_count: u16,
-    shard_bytes: u16,
     shards: ShardsCollection,
 ) -> Result<ShardsCollection, String> {
     let result = rs_decode(
         original_count as usize,
         recovery_count as usize,
-        shard_bytes as usize,
         shards.into(),
     )
     .map_err(|e| e.to_string())?;
@@ -271,8 +264,6 @@ mod tests {
     const SHARD: usize = 64;
 
     fn test_data(recovery_count: usize) -> RsShardsCollection {
-        let shard_bytes = SHARD;
-
         let mut data = vec![];
         data.extend([1u8; SHARD]);
         data.extend([2u8; SHARD]);
@@ -280,12 +271,12 @@ mod tests {
 
         let shards = RsShardsCollection {
             length: 3,
-            shard_len: shard_bytes as u16,
+            shard_len: SHARD as u16,
             data,
             indices: None,
         };
 
-        rs_encode(recovery_count, shard_bytes, shards).unwrap()
+        rs_encode(recovery_count, shards).unwrap()
     }
 
     #[test]
@@ -365,7 +356,7 @@ mod tests {
             indices: vec![encoded.chunk_index_at(0), 1, encoded.chunk_index_at(4)].into(),
         };
 
-        let decoded = rs_decode(3, recovery_count, SHARD, to_decode).unwrap();
+        let decoded = rs_decode(3, recovery_count, to_decode).unwrap();
 
         assert_eq!(decoded.length, 2);
         assert_eq!(decoded.shard_len, encoded.shard_len);
