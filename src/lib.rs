@@ -2,13 +2,20 @@
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use ark_ec_vrfs::suites::bandersnatch::edwards as bandersnatch;
+use ark_ec_vrfs::prelude::ark_ec::AffineRepr;
+use ark_ec_vrfs::ring::RingSuite;
+use ark_ec_vrfs::{pedersen::PedersenSuite, suites::bandersnatch::edwards as bandersnatch};
 use ark_ec_vrfs::{prelude::ark_serialize, suites::bandersnatch::edwards::RingContext};
-use bandersnatch::{IetfProof, Input, Output, Public, RingProof, Secret};
-
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use bandersnatch::{
+    AffinePoint, BandersnatchSha512Ell2, IetfProof, Input, Output, Public, RingProof, Secret,
+};
 
-const RING_SIZE: usize = 1023;
+#[derive(Clone, Copy)]
+enum RingSize {
+    Tiny,
+    Full,
+}
 
 // This is the IETF `Prove` procedure output as described in section 2.2
 // of the Bandersnatch VRFs specification
@@ -28,18 +35,33 @@ struct RingVrfSignature {
 }
 
 // "Static" ring context data
-fn ring_context(ring_size: usize) -> &'static RingContext {
+fn ring_context(ring_size: RingSize) -> &'static RingContext {
     use std::sync::OnceLock;
-    static RING_CTX: OnceLock<RingContext> = OnceLock::new();
-    RING_CTX.get_or_init(|| RingContext::from_seed(ring_size, [0; 32]))
+    static RING_CTX_TINY: OnceLock<RingContext> = OnceLock::new();
+    static RING_CTX_FULL: OnceLock<RingContext> = OnceLock::new();
+
+    let init = |size: usize| {
+        use bandersnatch::PcsParams;
+        use std::{fs::File, io::Read};
+        let manifest_dir =
+            std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
+        let filename = format!("{}/data/zcash-srs-2-11-uncompressed.bin", manifest_dir);
+        let mut file = File::open(filename).unwrap();
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf).unwrap();
+        let pcs_params = PcsParams::deserialize_uncompressed_unchecked(&mut &buf[..]).unwrap();
+        RingContext::from_srs(size, pcs_params).unwrap()
+    };
+
+    match ring_size {
+        RingSize::Tiny => RING_CTX_TINY.get_or_init(|| init(6)),
+        RingSize::Full => RING_CTX_FULL.get_or_init(|| init(1023)),
+    }
 }
 
 // Construct VRF Input Point from arbitrary data (section 1.2)
 fn vrf_input_point(vrf_input_data: &[u8]) -> Input {
-    let point =
-        <bandersnatch::BandersnatchSha512Ell2 as ark_ec_vrfs::Suite>::data_to_point(vrf_input_data)
-            .unwrap();
-    Input::from(point)
+    Input::new(vrf_input_data).unwrap()
 }
 
 // Prover actor.
@@ -47,15 +69,24 @@ struct Prover {
     pub prover_idx: usize,
     pub secret: Secret,
     pub ring: Vec<Public>,
+    pub size: RingSize,
 }
 
 impl Prover {
-    pub fn new(ring: Vec<Public>, prover_idx: usize) -> Self {
+    pub fn new(size: RingSize, ring: Vec<Public>, prover_idx: usize) -> Self {
         Self {
+            size,
             prover_idx,
             secret: Secret::from_seed(&prover_idx.to_le_bytes()),
             ring,
         }
+    }
+
+    /// VRF output hash.
+    pub fn vrf_output(&self, vrf_input_data: &[u8]) -> Vec<u8> {
+        let input = vrf_input_point(vrf_input_data);
+        let output = self.secret.output(input);
+        output.hash()[..32].try_into().unwrap()
     }
 
     /// Anonymous VRF signature.
@@ -71,8 +102,7 @@ impl Prover {
         let pts: Vec<_> = self.ring.iter().map(|pk| pk.0).collect();
 
         // Proof construction
-        let ring_ctx = ring_context(RING_SIZE);
-
+        let ring_ctx = ring_context(self.size);
         let prover_key = ring_ctx.prover_key(&pts);
         let prover = ring_ctx.prover(prover_key, self.prover_idx);
         let proof = self.secret.prove(input, output, aux_data, &prover);
@@ -104,21 +134,22 @@ impl Prover {
     }
 }
 
-type RingCommitment = ark_ec_vrfs::ring::RingCommitment<bandersnatch::BandersnatchSha512Ell2>;
+type RingCommitment = ark_ec_vrfs::ring::RingCommitment<BandersnatchSha512Ell2>;
 
 // Verifier actor.
 struct Verifier {
     pub commitment: RingCommitment,
     pub ring: Vec<Public>,
+    pub ring_size: RingSize,
 }
 
 impl Verifier {
-    fn new(ring: Vec<Public>, ring_size: usize) -> Self {
+    fn new(ring_size: RingSize, ring: Vec<Public>) -> Self {
         // Backend currently requires the wrapped type (plain affine points)
         let pts: Vec<_> = ring.iter().map(|pk| pk.0).collect();
         let verifier_key = ring_context(ring_size).verifier_key(&pts);
         let commitment = verifier_key.commitment();
-        Self { ring, commitment }
+        Self { ring, commitment, ring_size }
     }
 
     /// Anonymous VRF signature verification.
@@ -132,35 +163,31 @@ impl Verifier {
         aux_data: &[u8],
         signature: &[u8],
     ) -> Result<[u8; 32], ()> {
-        use ark_ec_vrfs::ring::prelude::fflonk::pcs::PcsParams;
         use ark_ec_vrfs::ring::Verifier as _;
-        use bandersnatch::VerifierKey;
 
         let signature = RingVrfSignature::deserialize_compressed(signature).unwrap();
 
         let input = vrf_input_point(vrf_input_data);
         let output = signature.output;
 
-        let ring_ctx = ring_context(RING_SIZE);
+        let ring_ctx = ring_context(self.ring_size);
 
         // The verifier key is reconstructed from the commitment and the constant
         // verifier key component of the SRS in order to verify some proof.
         // As an alternative we can construct the verifier key using the
         // RingContext::verifier_key() method, but is more expensive.
         // In other words, we prefer computing the commitment once, when the keyset changes.
-        let verifier_key = VerifierKey::from_commitment_and_kzg_vk::<
-            ark_ed_on_bls12_381_bandersnatch::BandersnatchConfig
-        >(
-            self.commitment.clone(),
-            ring_ctx.pcs_params.raw_vk(),
-        );
+        let verifier_key = ring_ctx.verifier_key_from_commitment(self.commitment.clone());
         let verifier = ring_ctx.verifier(verifier_key);
         if Public::verify(input, output, aux_data, &signature.proof, &verifier).is_err() {
+            println!("Ring signature verification failure");
             return Err(());
         }
+        println!("Ring signature verified");
 
         // This truncated hash is the actual value used as ticket-id/score in JAM
         let vrf_output_hash: [u8; 32] = output.hash()[..32].try_into().unwrap();
+        println!(" vrf-output-hash: {}", hex::encode(vrf_output_hash));
         Ok(vrf_output_hash)
     }
 
@@ -198,19 +225,59 @@ impl Verifier {
         // NOTE: as far as vrf_input_data is the same, this matches the one produced
         // using the ring-vrf (regardless of aux_data).
         let vrf_output_hash: [u8; 32] = output.hash()[..32].try_into().unwrap();
+        println!(" vrf-output-hash: {}", hex::encode(vrf_output_hash));
         Ok(vrf_output_hash)
     }
 }
 
+macro_rules! measure_time {
+    ($func_name:expr, $func_call:expr) => {{
+        let start = std::time::Instant::now();
+        let result = $func_call;
+        let duration = start.elapsed();
+        println!("* Time taken by {}: {:?}", $func_name, duration);
+        result
+    }};
+}
+
+fn print_point(name: &str, p: AffinePoint) {
+    println!("------------------------------");
+    println!("[{name}]");
+    println!("X: {}", p.x);
+    println!("Y: {}", p.y);
+    let mut buf = Vec::new();
+    p.serialize_compressed(&mut buf).unwrap();
+    println!("Compressed: 0x{}", hex::encode(buf));
+}
+
+fn print_points(ring_size: RingSize) {
+    println!("==============================");
+    print_point("Group Base", AffinePoint::generator());
+    print_point("Blinding Base", BandersnatchSha512Ell2::BLINDING_BASE);
+    print_point("Ring Padding", ring_context(ring_size).padding_point());
+    print_point("Accumulator Base", BandersnatchSha512Ell2::ACCUMULATOR_BASE);
+    println!("==============================");
+}
+
 #[wasm_bindgen]
 pub fn verify_safrole() -> bool {
-    let ring_set: Vec<_> = (0..RING_SIZE)
+    let ring_size = RingSize::Full;
+    let ring_len: i32 = 1023;
+
+    print_points(ring_size);
+
+    let mut ring: Vec<_> = (0..ring_len)
         .map(|i| Secret::from_seed(&i.to_le_bytes()).public())
         .collect();
     let prover_key_index = 3;
 
-    let prover = Prover::new(ring_set.clone(), prover_key_index);
-    let verifier = Verifier::new(ring_set, RING_SIZE);
+    // NOTE: any key can be replaced with the padding point
+    let padding_point = Public::from(ring_context(ring_size).padding_point());
+    ring[2] = padding_point;
+    ring[7] = padding_point;
+
+    let prover = Prover::new(ring_size, ring.clone(), prover_key_index);
+    let verifier = Verifier::new(ring_size, ring);
 
     let vrf_input_data = b"foo";
 
@@ -219,12 +286,16 @@ pub fn verify_safrole() -> bool {
     let aux_data = b"bar";
 
     // Prover signs some data.
-    let ring_signature = prover.ring_vrf_sign(vrf_input_data, aux_data);
-    // TODO [ToDr] ^^^ above fails because it requires randomness. Make the signature
-    // part of the function arguments.
+    let ring_signature = measure_time! {
+        "ring-vrf-sign",
+        prover.ring_vrf_sign(vrf_input_data, aux_data)
+    };
 
     // Verifier checks it without knowing who is the signer.
-    let ring_vrf_output = verifier.ring_vrf_verify(vrf_input_data, aux_data, &ring_signature).unwrap();
+    let ring_vrf_output_hash = measure_time! {
+        "ring-vrf-verify",
+        verifier.ring_vrf_verify(vrf_input_data, aux_data, &ring_signature).unwrap()
+    };
 
     //--- Non anonymous VRF
 
@@ -232,13 +303,23 @@ pub fn verify_safrole() -> bool {
 
     // Prover signs the same vrf-input data (we want the output to match)
     // But different aux data.
-    let ietf_signature = prover.ietf_vrf_sign(vrf_input_data, other_aux_data);
+    let ietf_signature = measure_time! {
+        "ietf-vrf-sign",
+        prover.ietf_vrf_sign(vrf_input_data, other_aux_data)
+    };
 
     // Verifier checks the signature knowing the signer identity.
-    let ietf_vrf_output = verifier.ietf_vrf_verify(vrf_input_data, other_aux_data, &ietf_signature, prover_key_index).unwrap();
+    let ietf_vrf_output_hash = measure_time! {
+        "ietf-vrf-verify",
+        verifier.ietf_vrf_verify(vrf_input_data, other_aux_data, &ietf_signature, prover_key_index).unwrap()
+    };
 
     // Must match
-    assert_eq!(ring_vrf_output, ietf_vrf_output);
+    assert_eq!(ring_vrf_output_hash, ietf_vrf_output_hash);
+
+    // We don't need to produce a signature to get the vrf output
+    let vrf_output_hash = prover.vrf_output(vrf_input_data);
+    assert_eq!(vrf_output_hash, ietf_vrf_output_hash);
 
     true
 }
@@ -248,11 +329,10 @@ pub fn ring_commitment(
     keys: Vec<u8>
 ) -> Vec<u8> {
     let keys: Vec<Public> = keys.chunks(32).map(|chunk| {
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(chunk);
-        Public::deserialize_compressed(&arr[..]).unwrap()
+        Public::deserialize_compressed(chunk).unwrap()
     }).collect();
-    let verifier = Verifier::new(keys.clone(), keys.len());
+    let ring_size = if keys.len() == 1023 { RingSize::Full } else { RingSize::Tiny };
+    let verifier = Verifier::new(ring_size, keys);
 
     let mut buf = Vec::new();
     verifier.commitment.serialize_compressed(&mut buf).unwrap();
