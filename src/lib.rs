@@ -42,13 +42,7 @@ fn ring_context(ring_size: RingSize) -> &'static RingContext {
 
     let init = |size: usize| {
         use bandersnatch::PcsParams;
-        use std::{fs::File, io::Read};
-        let manifest_dir =
-            std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let filename = format!("{}/data/zcash-srs-2-11-uncompressed.bin", manifest_dir);
-        let mut file = File::open(filename).unwrap();
-        let mut buf = Vec::new();
-        file.read_to_end(&mut buf).unwrap();
+        let buf = include_bytes!("../data/zcash-srs-2-11-uncompressed.bin");
         let pcs_params = PcsParams::deserialize_uncompressed_unchecked(&mut &buf[..]).unwrap();
         RingContext::from_srs(size, pcs_params).unwrap()
     };
