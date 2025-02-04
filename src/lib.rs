@@ -28,10 +28,10 @@ struct RingVrfSignature {
 }
 
 // "Static" ring context data
-fn ring_context() -> &'static RingContext {
+fn ring_context(ring_size: usize) -> &'static RingContext {
     use std::sync::OnceLock;
     static RING_CTX: OnceLock<RingContext> = OnceLock::new();
-    RING_CTX.get_or_init(|| RingContext::from_seed(RING_SIZE, [0; 32]))
+    RING_CTX.get_or_init(|| RingContext::from_seed(ring_size, [0; 32]))
 }
 
 // Construct VRF Input Point from arbitrary data (section 1.2)
@@ -71,7 +71,8 @@ impl Prover {
         let pts: Vec<_> = self.ring.iter().map(|pk| pk.0).collect();
 
         // Proof construction
-        let ring_ctx = ring_context();
+        let ring_ctx = ring_context(RING_SIZE);
+
         let prover_key = ring_ctx.prover_key(&pts);
         let prover = ring_ctx.prover(prover_key, self.prover_idx);
         let proof = self.secret.prove(input, output, aux_data, &prover);
@@ -112,10 +113,10 @@ struct Verifier {
 }
 
 impl Verifier {
-    fn new(ring: Vec<Public>) -> Self {
+    fn new(ring: Vec<Public>, ring_size: usize) -> Self {
         // Backend currently requires the wrapped type (plain affine points)
         let pts: Vec<_> = ring.iter().map(|pk| pk.0).collect();
-        let verifier_key = ring_context().verifier_key(&pts);
+        let verifier_key = ring_context(ring_size).verifier_key(&pts);
         let commitment = verifier_key.commitment();
         Self { ring, commitment }
     }
@@ -140,7 +141,7 @@ impl Verifier {
         let input = vrf_input_point(vrf_input_data);
         let output = signature.output;
 
-        let ring_ctx = ring_context();
+        let ring_ctx = ring_context(RING_SIZE);
 
         // The verifier key is reconstructed from the commitment and the constant
         // verifier key component of the SRS in order to verify some proof.
@@ -209,7 +210,7 @@ pub fn verify_safrole() -> bool {
     let prover_key_index = 3;
 
     let prover = Prover::new(ring_set.clone(), prover_key_index);
-    let verifier = Verifier::new(ring_set);
+    let verifier = Verifier::new(ring_set, RING_SIZE);
 
     let vrf_input_data = b"foo";
 
@@ -242,3 +243,18 @@ pub fn verify_safrole() -> bool {
     true
 }
 
+#[wasm_bindgen]
+pub fn ring_commitment(
+    keys: Vec<u8>
+) -> Vec<u8> {
+    let keys: Vec<Public> = keys.chunks(32).map(|chunk| {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(chunk);
+        Public::deserialize_compressed(&arr[..]).unwrap()
+    }).collect();
+    let verifier = Verifier::new(keys.clone(), keys.len());
+
+    let mut buf = Vec::new();
+    verifier.commitment.serialize_compressed(&mut buf).unwrap();
+    buf    
+}
