@@ -9,3 +9,8 @@ export function verify_safrole(): boolean;
 * @returns {Uint8Array}
 */
 export function ring_commitment(keys: Uint8Array): Uint8Array;
+/**
+* @param {Uint8Array} signature
+* @returns {Uint8Array}
+*/
+export function get_entropy_hash(signature: Uint8Array): Uint8Array;
