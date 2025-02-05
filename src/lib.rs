@@ -337,8 +337,8 @@ pub fn ring_commitment(
 pub fn get_entropy_hash(
     signature: &[u8],
 ) -> Vec<u8> {
-    let signature = IetfVrfSignature::deserialize_compressed(signature).unwrap();
-    let output = signature.output;
+    let signature = RingVrfSignature::deserialize_compressed(signature).unwrap();
+    let output: ark_ec_vrfs::Output<BandersnatchSha512Ell2> = signature.output;
     let vrf_output_hash: [u8; 32] = output.hash()[..32].try_into().unwrap();
     vrf_output_hash.to_vec()
 }
