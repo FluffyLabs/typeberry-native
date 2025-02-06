@@ -60,20 +60,24 @@ module.exports.ring_commitment = function(keys) {
 };
 
 /**
-* @param {Uint8Array} signatures
+* @param {Uint8Array} keys
+* @param {Uint8Array} tickets_data
+* @param {number} context_length
 * @returns {Uint8Array}
 */
-module.exports.entropy_hash = function(signatures) {
+module.exports.verify_ticket = function(keys, tickets_data, context_length) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArray8ToWasm0(signatures, wasm.__wbindgen_malloc);
+        const ptr0 = passArray8ToWasm0(keys, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
-        wasm.entropy_hash(retptr, ptr0, len0);
+        const ptr1 = passArray8ToWasm0(tickets_data, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.verify_ticket(retptr, ptr0, len0, ptr1, len1, context_length);
         var r0 = getInt32Memory0()[retptr / 4 + 0];
         var r1 = getInt32Memory0()[retptr / 4 + 1];
-        var v2 = getArrayU8FromWasm0(r0, r1).slice();
+        var v3 = getArrayU8FromWasm0(r0, r1).slice();
         wasm.__wbindgen_free(r0, r1 * 1, 1);
-        return v2;
+        return v3;
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
