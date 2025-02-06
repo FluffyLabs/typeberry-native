@@ -1,5 +1,6 @@
 //#![cfg_attr(not(feature = "std"), no_std)]
 
+use ark_ec_vrfs::prelude::ark_serialize::SerializationError;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use ark_ec_vrfs::prelude::ark_ec::AffineRepr;
@@ -327,13 +328,13 @@ pub fn verify_safrole() -> bool {
     true
 }
 
-fn create_verifier(keys: &[u8]) -> Verifier {
+fn create_verifier(keys: &[u8]) -> Result<Verifier, SerializationError> {
     let keys: Vec<Public> = keys.chunks(HASH_SIZE).map(|chunk| {
-        Public::deserialize_compressed(chunk).unwrap()
-    }).collect();
+        Public::deserialize_compressed(chunk)
+    }).collect::<Result<Vec<_>, _>>()?;
     let ring_size = if keys.len() == RingSize::Full.size() { RingSize::Full } else { RingSize::Tiny };
     let verifier = Verifier::new(ring_size, keys);
-    verifier
+    Ok(verifier)
 }
 
 // Return types are always starting with a byte representing either
@@ -346,7 +347,12 @@ const HASH_SIZE: usize = 32;
 pub fn ring_commitment(
     keys: &[u8]
 ) -> Vec<u8> {
-    let verifier = create_verifier(keys);
+    let verifier_result = create_verifier(keys);
+    if verifier_result.is_err() {
+        return vec![RESULT_ERR];
+    }
+
+    let verifier = verifier_result.unwrap();
     let mut buf = Vec::new();
     buf.push(RESULT_OK);
     match verifier.commitment.serialize_compressed(&mut buf) {
@@ -356,24 +362,6 @@ pub fn ring_commitment(
 }
 
 const SIGNATURE_SIZE: usize = 784;
-#[wasm_bindgen]
-pub fn entropy_hash(
-    signatures: &[u8],
-) -> Vec<u8> {
-    let signatures = signatures.chunks(SIGNATURE_SIZE).map(|chunk| {
-        let signature = RingVrfSignature::deserialize_compressed(chunk).unwrap();
-        let output: ark_ec_vrfs::Output<BandersnatchSha512Ell2> = signature.output;
-        let vrf_output_hash: [u8; HASH_SIZE] = output.hash()[..HASH_SIZE].try_into().unwrap();
-        vrf_output_hash
-    });
-
-    let mut result = Vec::new();
-    for sig in signatures {
-        result.extend(&sig);
-    }
-
-    result
-}
 
 #[wasm_bindgen]
 pub fn verify_ticket(
@@ -381,7 +369,11 @@ pub fn verify_ticket(
     tickets_data: &[u8], // [proof/signature (784 bytes), context (? bytes); NO_OF_TICKETS]
     context_length: u32,
 ) -> Vec<u8> {
-    let verifier = create_verifier(keys);
+    let verifier_result = create_verifier(keys);
+    if verifier_result.is_err() {
+        return vec![RESULT_ERR];
+    }
+    let verifier = verifier_result.unwrap();
     let chunk_size = context_length as usize + SIGNATURE_SIZE;
     let proofs = tickets_data.chunks(chunk_size).fold(vec![], |mut result, chunk| {
         let signature = &chunk[0..SIGNATURE_SIZE];
