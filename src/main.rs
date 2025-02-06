@@ -6,10 +6,11 @@ const SIGNATURE_HEX: &str = "b342bf8f6fa69c745daad2e99c92929b1da2b840f67e5e8015a
 fn main() {
     let keys = hex::decode(KEYS_HEX).unwrap();
     println!("Keys: 0x{}", hex::encode(&keys));
-    let commitment = ring_commitment(keys);
+    let commitment = ring_commitment(&keys);
     println!("Commitment: 0x{}", hex::encode(&commitment));
+    assert_eq!(hex::encode(&commitment), EXPECTED_COMMITMENT);
     let signature = hex::decode(SIGNATURE_HEX).unwrap();
-    let hash = get_entropy_hash(&signature);
+    let hash = entropy_hash(&signature);
     println!("Hash: 0x{}", hex::encode(&hash));
 }
 
