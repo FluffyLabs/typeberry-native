@@ -356,24 +356,24 @@ pub fn ring_commitment(
 }
 
 const SIGNATURE_SIZE: usize = 784;
-// #[wasm_bindgen]
-// pub fn entropy_hash(
-//     signatures: &[u8],
-// ) -> Vec<u8> {
-//     let signatures = signatures.chunks(SIGNATURE_SIZE).map(|chunk| {
-//         let signature = RingVrfSignature::deserialize_compressed(chunk).unwrap();
-//         let output: ark_ec_vrfs::Output<BandersnatchSha512Ell2> = signature.output;
-//         let vrf_output_hash: [u8; HASH_SIZE] = output.hash()[..HASH_SIZE].try_into().unwrap();
-//         vrf_output_hash
-//     });
-//
-//     let mut result = Vec::new();
-//     for sig in signatures {
-//         result.extend(&sig);
-//     }
-//
-//     result
-// }
+#[wasm_bindgen]
+pub fn entropy_hash(
+    signatures: &[u8],
+) -> Vec<u8> {
+    let signatures = signatures.chunks(SIGNATURE_SIZE).map(|chunk| {
+        let signature = RingVrfSignature::deserialize_compressed(chunk).unwrap();
+        let output: ark_ec_vrfs::Output<BandersnatchSha512Ell2> = signature.output;
+        let vrf_output_hash: [u8; HASH_SIZE] = output.hash()[..HASH_SIZE].try_into().unwrap();
+        vrf_output_hash
+    });
+
+    let mut result = Vec::new();
+    for sig in signatures {
+        result.extend(&sig);
+    }
+
+    result
+}
 
 #[wasm_bindgen]
 pub fn verify_ticket(

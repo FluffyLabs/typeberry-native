@@ -10,6 +10,11 @@ export function verify_safrole(): boolean;
 */
 export function ring_commitment(keys: Uint8Array): Uint8Array;
 /**
+* @param {Uint8Array} signatures
+* @returns {Uint8Array}
+*/
+export function entropy_hash(signatures: Uint8Array): Uint8Array;
+/**
 * @param {Uint8Array} keys
 * @param {Uint8Array} tickets_data
 * @param {number} context_length
