@@ -327,44 +327,78 @@ pub fn verify_safrole() -> bool {
     true
 }
 
-const HASH_SIZE: usize = 32;
-
-#[wasm_bindgen]
-pub fn ring_commitment(
-    keys: &[u8]
-) -> Vec<u8> {
+fn create_verifier(keys: &[u8]) -> Verifier {
     let keys: Vec<Public> = keys.chunks(HASH_SIZE).map(|chunk| {
         Public::deserialize_compressed(chunk).unwrap()
     }).collect();
     let ring_size = if keys.len() == RingSize::Full.size() { RingSize::Full } else { RingSize::Tiny };
     let verifier = Verifier::new(ring_size, keys);
+    verifier
+}
 
+// Return types are always starting with a byte representing either
+// OK or ERROR code.
+const RESULT_OK: u8 = 0;
+const RESULT_ERR: u8 = 1;
+
+const HASH_SIZE: usize = 32;
+#[wasm_bindgen]
+pub fn ring_commitment(
+    keys: &[u8]
+) -> Vec<u8> {
+    let verifier = create_verifier(keys);
     let mut buf = Vec::new();
-    verifier.commitment.serialize_compressed(&mut buf).unwrap();
-    buf    
+    buf.push(RESULT_OK);
+    match verifier.commitment.serialize_compressed(&mut buf) {
+        Ok(_) => buf,
+        Err(_) => vec![RESULT_ERR],
+    }
 }
 
 const SIGNATURE_SIZE: usize = 784;
+// #[wasm_bindgen]
+// pub fn entropy_hash(
+//     signatures: &[u8],
+// ) -> Vec<u8> {
+//     let signatures = signatures.chunks(SIGNATURE_SIZE).map(|chunk| {
+//         let signature = RingVrfSignature::deserialize_compressed(chunk).unwrap();
+//         let output: ark_ec_vrfs::Output<BandersnatchSha512Ell2> = signature.output;
+//         let vrf_output_hash: [u8; HASH_SIZE] = output.hash()[..HASH_SIZE].try_into().unwrap();
+//         vrf_output_hash
+//     });
+//
+//     let mut result = Vec::new();
+//     for sig in signatures {
+//         result.extend(&sig);
+//     }
+//
+//     result
+// }
 
 #[wasm_bindgen]
-pub fn entropy_hash(
-    signatures: &[u8],
+pub fn verify_ticket(
+    keys: &[u8],
+    tickets_data: &[u8], // [proof/signature (784 bytes), context (? bytes); NO_OF_TICKETS]
+    context_length: u32,
 ) -> Vec<u8> {
-    let signatures = signatures.chunks(SIGNATURE_SIZE).map(|chunk| {
-        let signature = RingVrfSignature::deserialize_compressed(chunk).unwrap();
-        let output: ark_ec_vrfs::Output<BandersnatchSha512Ell2> = signature.output;
-        let vrf_output_hash: [u8; 32] = output.hash()[..32].try_into().unwrap();
-        vrf_output_hash
+    let verifier = create_verifier(keys);
+    let chunk_size = context_length as usize + SIGNATURE_SIZE;
+    let proofs = tickets_data.chunks(chunk_size).fold(vec![], |mut result, chunk| {
+        let signature = &chunk[0..SIGNATURE_SIZE];
+        let aux_data = &chunk[SIGNATURE_SIZE..];
+
+        match verifier.ring_vrf_verify(&[], aux_data, signature) {
+            Ok(entropy) => {
+                result.push(RESULT_OK);
+                result.extend(entropy);
+            },
+            Err(_) => {
+                result.push(RESULT_ERR);
+                result.extend([0u8; 32]);
+            }
+        };
+        result
     });
 
-    let mut result = Vec::new();
-    for sig in signatures {
-        result.extend(&sig);
-    }
-
-    result
+    proofs
 }
-
-    // #[wasm_bindgen]
-    // pub fn verify_ticket(
-    // ticket_data: &[u8]

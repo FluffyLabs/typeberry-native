@@ -9,9 +9,9 @@ fn main() {
     let commitment = ring_commitment(&keys);
     println!("Commitment: 0x{}", hex::encode(&commitment));
     assert_eq!(hex::encode(&commitment), EXPECTED_COMMITMENT);
-    let signature = hex::decode(SIGNATURE_HEX).unwrap();
-    let hash = entropy_hash(&signature);
-    println!("Hash: 0x{}", hex::encode(&hash));
+    // let signature = hex::decode(SIGNATURE_HEX).unwrap();
+    // let hash = entropy_hash(&signature);
+    // println!("Hash: 0x{}", hex::encode(&hash));
 }
 
-const EXPECTED_COMMITMENT: &str = "b3750bba87e39fb38579c880ff3b5c4e0aa90df8ff8be1ddc5fdd615c6780955f8fd85d99fd92a3f1d4585eb7ae8d627b01dd76d41720d73c9361a1dd2e830871155834c55db72de38fb875a9470faedb8cae54b34f7bfe196a9caca00c2911592e630ae2b14e758ab0960e372172203f4c9a41777dadd529971d7ab9d23ab29fe0e9c85ec450505dde7f5ac038274cf";
+const EXPECTED_COMMITMENT: &str = "00b3750bba87e39fb38579c880ff3b5c4e0aa90df8ff8be1ddc5fdd615c6780955f8fd85d99fd92a3f1d4585eb7ae8d627b01dd76d41720d73c9361a1dd2e830871155834c55db72de38fb875a9470faedb8cae54b34f7bfe196a9caca00c2911592e630ae2b14e758ab0960e372172203f4c9a41777dadd529971d7ab9d23ab29fe0e9c85ec450505dde7f5ac038274cf";
