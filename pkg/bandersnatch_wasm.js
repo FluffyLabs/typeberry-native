@@ -60,15 +60,15 @@ module.exports.ring_commitment = function(keys) {
 };
 
 /**
-* @param {Uint8Array} signature
+* @param {Uint8Array} signatures
 * @returns {Uint8Array}
 */
-module.exports.get_entropy_hash = function(signature) {
+module.exports.entropy_hash = function(signatures) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArray8ToWasm0(signature, wasm.__wbindgen_malloc);
+        const ptr0 = passArray8ToWasm0(signatures, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
-        wasm.get_entropy_hash(retptr, ptr0, len0);
+        wasm.entropy_hash(retptr, ptr0, len0);
         var r0 = getInt32Memory0()[retptr / 4 + 0];
         var r1 = getInt32Memory0()[retptr / 4 + 1];
         var v2 = getArrayU8FromWasm0(r0, r1).slice();
