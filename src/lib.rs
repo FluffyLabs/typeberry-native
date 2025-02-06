@@ -387,7 +387,7 @@ pub fn verify_ticket(
         let signature = &chunk[0..SIGNATURE_SIZE];
         let aux_data = &chunk[SIGNATURE_SIZE..];
 
-        match verifier.ring_vrf_verify(&[], aux_data, signature) {
+        match verifier.ring_vrf_verify(aux_data, &[], signature) {
             Ok(entropy) => {
                 result.push(RESULT_OK);
                 result.extend(entropy);
