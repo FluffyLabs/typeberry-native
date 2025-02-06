@@ -1,6 +1,5 @@
 //#![cfg_attr(not(feature = "std"), no_std)]
 
-use ark_ec_vrfs::prelude::ark_serialize::SerializationError;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use ark_ec_vrfs::prelude::ark_ec::AffineRepr;
@@ -328,13 +327,15 @@ pub fn verify_safrole() -> bool {
     true
 }
 
-fn create_verifier(keys: &[u8]) -> Result<Verifier, SerializationError> {
-    let keys: Vec<Public> = keys.chunks(HASH_SIZE).map(|chunk| {
+fn create_verifier(keys: &[u8]) -> Verifier {
+    let ring_size = if keys.len() / HASH_SIZE == RingSize::Full.size() { RingSize::Full } else { RingSize::Tiny };
+    let ring = ring_context(ring_size);
+    let keys = keys.chunks(HASH_SIZE).map(|chunk| {
         Public::deserialize_compressed(chunk)
-    }).collect::<Result<Vec<_>, _>>()?;
-    let ring_size = if keys.len() == RingSize::Full.size() { RingSize::Full } else { RingSize::Tiny };
+            .unwrap_or_else(|_| Public::from(ring.padding_point()))
+    }).collect();
     let verifier = Verifier::new(ring_size, keys);
-    Ok(verifier)
+    verifier
 }
 
 // Return types are always starting with a byte representing either
@@ -347,12 +348,7 @@ const HASH_SIZE: usize = 32;
 pub fn ring_commitment(
     keys: &[u8]
 ) -> Vec<u8> {
-    let verifier_result = create_verifier(keys);
-    if verifier_result.is_err() {
-        return vec![RESULT_ERR];
-    }
-
-    let verifier = verifier_result.unwrap();
+    let verifier = create_verifier(keys);
     let mut buf = Vec::new();
     buf.push(RESULT_OK);
     match verifier.commitment.serialize_compressed(&mut buf) {
@@ -369,11 +365,7 @@ pub fn verify_ticket(
     tickets_data: &[u8], // [proof/signature (784 bytes), context (? bytes); NO_OF_TICKETS]
     context_length: u32,
 ) -> Vec<u8> {
-    let verifier_result = create_verifier(keys);
-    if verifier_result.is_err() {
-        return vec![RESULT_ERR];
-    }
-    let verifier = verifier_result.unwrap();
+    let verifier = create_verifier(keys);
     let chunk_size = context_length as usize + SIGNATURE_SIZE;
     let proofs = tickets_data.chunks(chunk_size).fold(vec![], |mut result, chunk| {
         let signature = &chunk[0..SIGNATURE_SIZE];
