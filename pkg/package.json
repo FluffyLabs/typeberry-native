@@ -1,0 +1,11 @@
+{
+  "name": "ed25519-wasm",
+  "version": "0.1.0",
+  "files": [
+    "ed25519_wasm_bg.wasm",
+    "ed25519_wasm.js",
+    "ed25519_wasm.d.ts"
+  ],
+  "main": "ed25519_wasm.js",
+  "types": "ed25519_wasm.d.ts"
+}
