@@ -152,7 +152,11 @@ impl Verifier {
         let pts: Vec<_> = ring.iter().map(|pk| pk.0).collect();
         let verifier_key = ring_context(ring_size).verifier_key(&pts);
         let commitment = verifier_key.commitment();
-        Self { ring, commitment, ring_size }
+        Self {
+            ring,
+            commitment,
+            ring_size,
+        }
     }
 
     /// Anonymous VRF signature verification.
@@ -328,12 +332,19 @@ pub fn verify_safrole() -> bool {
 }
 
 fn create_verifier(keys: &[u8]) -> Verifier {
-    let ring_size = if keys.len() / HASH_SIZE == RingSize::Full.size() { RingSize::Full } else { RingSize::Tiny };
+    let ring_size = if keys.len() / HASH_SIZE == RingSize::Full.size() {
+        RingSize::Full
+    } else {
+        RingSize::Tiny
+    };
     let ring = ring_context(ring_size);
-    let keys = keys.chunks(HASH_SIZE).map(|chunk| {
-        Public::deserialize_compressed(chunk)
-            .unwrap_or_else(|_| Public::from(ring.padding_point()))
-    }).collect();
+    let keys = keys
+        .chunks(HASH_SIZE)
+        .map(|chunk| {
+            Public::deserialize_compressed(chunk)
+                .unwrap_or_else(|_| Public::from(ring.padding_point()))
+        })
+        .collect();
     let verifier = Verifier::new(ring_size, keys);
     verifier
 }
@@ -344,10 +355,9 @@ const RESULT_OK: u8 = 0;
 const RESULT_ERR: u8 = 1;
 
 const HASH_SIZE: usize = 32;
+
 #[wasm_bindgen]
-pub fn ring_commitment(
-    keys: &[u8]
-) -> Vec<u8> {
+pub fn ring_commitment(keys: &[u8]) -> Vec<u8> {
     let verifier = create_verifier(keys);
     let mut buf = Vec::new();
     buf.push(RESULT_OK);
@@ -359,30 +369,62 @@ pub fn ring_commitment(
 
 const SIGNATURE_SIZE: usize = 784;
 
+/// Seal verification as defined in:
+/// https://graypaper.fluffylabs.dev/#/68eaa1f/0eff000eff00?v=0.6.4
+/// or
+/// https://graypaper.fluffylabs.dev/#/68eaa1f/0e54010e5401?v=0.6.4
 #[wasm_bindgen]
-pub fn verify_ticket(
+pub fn verify_seal(
     keys: &[u8],
-    tickets_data: &[u8], // [proof/signature (784 bytes), context (? bytes); NO_OF_TICKETS]
-    context_length: u32,
+    signer_key_index: u32,
+    signature: &[u8], // VRF Signature (96 bytes)
+    seal_data: &[u8], // vrf_input_data (? bytes)
+    aux_data: &[u8],  // aux_data (? bytes)
+) {
+    let mut result = vec![];
+    let verifier = create_verifier(keys);
+    match verifier.ietf_vrf_verify(seal_data, aux_data, signature, signer_key_index as usize) {
+        Ok(entropy) => {
+            result.push(RESULT_OK);
+            result.extend(entropy);
+        }
+        Err(_) => {
+            result.push(RESULT_ERR);
+            result.extend([0u8; 32]);
+        }
+    }
+}
+
+/// Verify multiple tickets at once as defined in:
+/// https://graypaper.fluffylabs.dev/#/68eaa1f/0f3e000f3e00?v=0.6.4
+///
+/// NOTE: the aux_data of VRF function is empty!
+#[wasm_bindgen]
+pub fn batch_verify_tickets(
+    keys: &[u8],
+    tickets_data: &[u8], // [proof/signature (784 bytes), vrf_input_data (? bytes); NO_OF_TICKETS]
+    vrf_input_data_len: u32, // the data we prove over
 ) -> Vec<u8> {
     let verifier = create_verifier(keys);
-    let chunk_size = context_length as usize + SIGNATURE_SIZE;
-    let proofs = tickets_data.chunks(chunk_size).fold(vec![], |mut result, chunk| {
-        let signature = &chunk[0..SIGNATURE_SIZE];
-        let aux_data = &chunk[SIGNATURE_SIZE..];
+    let chunk_size = vrf_input_data_len as usize + SIGNATURE_SIZE;
+    let proofs = tickets_data
+        .chunks(chunk_size)
+        .fold(vec![], |mut result, chunk| {
+            let signature = &chunk[0..SIGNATURE_SIZE];
+            let vrf_input_data = &chunk[SIGNATURE_SIZE..];
 
-        match verifier.ring_vrf_verify(aux_data, &[], signature) {
-            Ok(entropy) => {
-                result.push(RESULT_OK);
-                result.extend(entropy);
-            },
-            Err(_) => {
-                result.push(RESULT_ERR);
-                result.extend([0u8; 32]);
-            }
-        };
-        result
-    });
+            match verifier.ring_vrf_verify(vrf_input_data, &[], signature) {
+                Ok(entropy) => {
+                    result.push(RESULT_OK);
+                    result.extend(entropy);
+                }
+                Err(_) => {
+                    result.push(RESULT_ERR);
+                    result.extend([0u8; 32]);
+                }
+            };
+            result
+        });
 
     proofs
 }
