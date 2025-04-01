@@ -377,13 +377,13 @@ const SIGNATURE_SIZE: usize = 784;
 pub fn verify_seal(
     keys: &[u8],
     signer_key_index: u32,
-    signature: &[u8], // VRF Signature (96 bytes)
-    seal_data: &[u8], // vrf_input_data (? bytes)
+    seal_data: &[u8], // VRF Signature (96 bytes)
+    payload: &[u8], // vrf_input_data (? bytes)
     aux_data: &[u8],  // aux_data (? bytes)
-) {
+) -> Vec<u8> {
     let mut result = vec![];
     let verifier = create_verifier(keys);
-    match verifier.ietf_vrf_verify(seal_data, aux_data, signature, signer_key_index as usize) {
+    match verifier.ietf_vrf_verify(payload, aux_data, seal_data, signer_key_index as usize) {
         Ok(entropy) => {
             result.push(RESULT_OK);
             result.extend(entropy);
@@ -393,6 +393,7 @@ pub fn verify_seal(
             result.extend([0u8; 32]);
         }
     }
+    result
 }
 
 /// Verify multiple tickets at once as defined in:

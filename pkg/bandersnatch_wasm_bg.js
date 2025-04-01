@@ -1,12 +1,15 @@
-let imports = {};
 let wasm;
+export function __wbg_set_wasm(val) {
+    wasm = val;
+}
+
 /**
 * @returns {boolean}
 */
-module.exports.verify_safrole = function() {
+export function verify_safrole() {
     const ret = wasm.verify_safrole();
     return ret !== 0;
-};
+}
 
 let cachedUint8Memory0 = null;
 
@@ -43,7 +46,7 @@ function getArrayU8FromWasm0(ptr, len) {
 * @param {Uint8Array} keys
 * @returns {Uint8Array}
 */
-module.exports.ring_commitment = function(keys) {
+export function ring_commitment(keys) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
         const ptr0 = passArray8ToWasm0(keys, wasm.__wbindgen_malloc);
@@ -57,7 +60,7 @@ module.exports.ring_commitment = function(keys) {
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
-};
+}
 
 /**
 * Seal verification as defined in:
@@ -71,7 +74,7 @@ module.exports.ring_commitment = function(keys) {
 * @param {Uint8Array} aux_data
 * @returns {Uint8Array}
 */
-module.exports.verify_seal = function(keys, signer_key_index, seal_data, payload, aux_data) {
+export function verify_seal(keys, signer_key_index, seal_data, payload, aux_data) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
         const ptr0 = passArray8ToWasm0(keys, wasm.__wbindgen_malloc);
@@ -91,7 +94,7 @@ module.exports.verify_seal = function(keys, signer_key_index, seal_data, payload
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
-};
+}
 
 /**
 * Verify multiple tickets at once as defined in:
@@ -103,7 +106,7 @@ module.exports.verify_seal = function(keys, signer_key_index, seal_data, payload
 * @param {number} vrf_input_data_len
 * @returns {Uint8Array}
 */
-module.exports.batch_verify_tickets = function(keys, tickets_data, vrf_input_data_len) {
+export function batch_verify_tickets(keys, tickets_data, vrf_input_data_len) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
         const ptr0 = passArray8ToWasm0(keys, wasm.__wbindgen_malloc);
@@ -119,13 +122,5 @@ module.exports.batch_verify_tickets = function(keys, tickets_data, vrf_input_dat
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
-};
-
-const path = require('path').join(__dirname, 'bandersnatch_wasm_bg.wasm');
-const bytes = require('fs').readFileSync(path);
-
-const wasmModule = new WebAssembly.Module(bytes);
-const wasmInstance = new WebAssembly.Instance(wasmModule, imports);
-wasm = wasmInstance.exports;
-module.exports.__wasm = wasm;
+}
 

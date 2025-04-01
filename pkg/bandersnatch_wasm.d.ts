@@ -16,11 +16,12 @@ export function ring_commitment(keys: Uint8Array): Uint8Array;
 * https://graypaper.fluffylabs.dev/#/68eaa1f/0e54010e5401?v=0.6.4
 * @param {Uint8Array} keys
 * @param {number} signer_key_index
-* @param {Uint8Array} signature
 * @param {Uint8Array} seal_data
+* @param {Uint8Array} payload
 * @param {Uint8Array} aux_data
+* @returns {Uint8Array}
 */
-export function verify_seal(keys: Uint8Array, signer_key_index: number, signature: Uint8Array, seal_data: Uint8Array, aux_data: Uint8Array): void;
+export function verify_seal(keys: Uint8Array, signer_key_index: number, seal_data: Uint8Array, payload: Uint8Array, aux_data: Uint8Array): Uint8Array;
 /**
 * Verify multiple tickets at once as defined in:
 * https://graypaper.fluffylabs.dev/#/68eaa1f/0f3e000f3e00?v=0.6.4
