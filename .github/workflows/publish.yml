@@ -1,4 +1,4 @@
-name: Publish bandersnatch
+name: Publish
 
 on:
   workflow_dispatch:
