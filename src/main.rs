@@ -14,8 +14,9 @@ fn main() {
     println!("\nTesting key generation...");
     let seed = hex::decode(SEED).unwrap();
     println!("Seed: {}", SEED);
-    let public_key = derive_public_key(&seed);
-    let public_key = &public_key[1..]; // we skip 1st byte, bcs its a result status
+    let key_pair = derive_key_pair(&seed);
+    // we skip 1st byte, bcs its a result status, and first key bcs its private key
+    let public_key = &key_pair[1 + 64..];
     println!("Secret key: {}", hex::encode(&public_key));
     assert_eq!(hex::encode(&public_key), EXPECTED_SECRET_KEY);
 

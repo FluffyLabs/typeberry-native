@@ -368,13 +368,20 @@ pub fn ring_commitment(keys: &[u8]) -> Vec<u8> {
 
 const SIGNATURE_SIZE: usize = 784;
 
-/// Derive Public Key from Seed
+/// Derive Private and Public Key from Seed
+///
+/// returns: Vec<u8> containing the exit status followed by the private key followed by the public key
 #[wasm_bindgen]
-pub fn derive_public_key(seed: &[u8]) -> Vec<u8> {
+pub fn derive_key_pair(seed: &[u8]) -> Vec<u8> {
     let secret = Secret::from_seed(&seed);
 
     let mut result = vec![RESULT_OK];
     let mut buf = Vec::new();
+    if secret.serialize_compressed(&mut buf).is_ok() {
+        result.extend(buf.clone());
+    } else {
+        return vec![RESULT_ERR];
+    }
     if secret.public().serialize_compressed(&mut buf).is_ok() {
         result.extend(buf);
     } else {
