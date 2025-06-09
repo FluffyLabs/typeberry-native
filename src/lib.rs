@@ -370,7 +370,7 @@ const SIGNATURE_SIZE: usize = 784;
 
 /// Derive Private and Public Key from Seed
 ///
-/// returns: Vec<u8> containing the exit status followed by the private key followed by the public key
+/// returns: `Vec<u8>` containing the exit (1 byte) status followed by the (64 bytes) private key followed by the (32 bytes) public key
 #[wasm_bindgen]
 pub fn derive_key_pair(seed: &[u8]) -> Vec<u8> {
     let secret = Secret::from_seed(&seed);

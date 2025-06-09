@@ -18,13 +18,13 @@ fn main() {
     // we skip 1st byte, bcs its a result status, and first key bcs its private key
     let public_key = &key_pair[1 + 64..];
     println!("Public key: {}", hex::encode(&public_key));
-    assert_eq!(hex::encode(&public_key), EXPECTED_SECRET_KEY);
+    assert_eq!(hex::encode(&public_key), EXPECTED_PUBLIC_KEY);
 
     // let signature = hex::decode(SIGNATURE_HEX).unwrap();
     // let hash = entropy_hash(&signature);
     // println!("Hash: 0x{}", hex::encode(&hash));
 }
 const SEED: &str = "007596986419e027e65499cc87027a236bf4a78b5e8bd7f675759d73e7a9c799";
-const EXPECTED_SECRET_KEY: &str =
+const EXPECTED_PUBLIC_KEY: &str =
     "ff71c6c03ff88adb5ed52c9681de1629a54e702fc14729f6b50d2f0a76f185b3";
 const EXPECTED_COMMITMENT: &str = "008387a131593447e4e1c3d4e220c322e42d33207fa77cd0fedb39fc3491479ca47a2d82295252e278fa3eec78185982ed82ae0c8fd691335e703d663fb5be02b3def15380789320636b2479beab5a03ccb3f0909ffea59d859fcdc7e187e45a8c92e630ae2b14e758ab0960e372172203f4c9a41777dadd529971d7ab9d23ab29fe0e9c85ec450505dde7f5ac038274cf";
