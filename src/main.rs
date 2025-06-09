@@ -17,7 +17,7 @@ fn main() {
     let key_pair = derive_key_pair(&seed);
     // we skip 1st byte, bcs its a result status, and first key bcs its private key
     let public_key = &key_pair[1 + 64..];
-    println!("Secret key: {}", hex::encode(&public_key));
+    println!("Public key: {}", hex::encode(&public_key));
     assert_eq!(hex::encode(&public_key), EXPECTED_SECRET_KEY);
 
     // let signature = hex::decode(SIGNATURE_HEX).unwrap();
