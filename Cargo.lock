@@ -174,7 +174,7 @@ dependencies = [
 [[package]]
 name = "ark-vrf"
 version = "0.1.0"
-source = "git+https://github.com/davxy/ark-vrf.git?rev=bf2d1cf#bf2d1cf8ec648cf57b0eb1252639798481e05a29"
+source = "git+https://github.com/davxy/ark-vrf.git?rev=29e53a0#29e53a0e642b1ccf95bdf881df5b0eaf3bbb8d04"
 dependencies = [
  "ark-bls12-381",
  "ark-ec",

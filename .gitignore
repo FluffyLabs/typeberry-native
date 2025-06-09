@@ -3,3 +3,4 @@
 /www/.parcel-cache
 /www/dist
 /www/node_modules
+/pkg/

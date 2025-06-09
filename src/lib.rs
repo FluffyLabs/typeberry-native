@@ -368,6 +368,22 @@ pub fn ring_commitment(keys: &[u8]) -> Vec<u8> {
 
 const SIGNATURE_SIZE: usize = 784;
 
+/// Derive Public Key from Seed
+#[wasm_bindgen]
+pub fn derive_public_key(seed: &[u8]) -> Vec<u8> {
+    let secret = Secret::from_seed(&seed);
+
+    let mut result = vec![RESULT_OK];
+    let mut buf = Vec::new();
+    if secret.public().serialize_compressed(&mut buf).is_ok() {
+        result.extend(buf);
+    } else {
+        return vec![RESULT_ERR];
+    }
+
+    result
+}
+
 /// Seal verification as defined in:
 /// https://graypaper.fluffylabs.dev/#/68eaa1f/0eff000eff00?v=0.6.4
 /// or

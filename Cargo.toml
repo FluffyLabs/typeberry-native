@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ark-vrf = { git = "https://github.com/davxy/ark-vrf.git" , default-features = false, features = ["bandersnatch", "ring"], rev = "bf2d1cf" }
+ark-vrf = { git = "https://github.com/davxy/ark-vrf.git", default-features = false, features = [
+    "bandersnatch",
+    "ring",
+], rev = "29e53a0" }
 hex = "0.4.3"
 
 web-sys = { version = "0.3", features = ["console"] }
