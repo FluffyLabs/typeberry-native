@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [ "main" ]
-  pull_request:
 
 jobs:
   publish-pvm:
@@ -45,4 +44,4 @@ jobs:
       working-directory: ./pkg/
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      run: npm publish --dry-run --access public
+      run: npm publish --access public
