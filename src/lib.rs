@@ -89,7 +89,7 @@ impl Prover {
     pub fn vrf_output(&self, vrf_input_data: &[u8]) -> Vec<u8> {
         let input = vrf_input_point(vrf_input_data);
         let output = self.secret.output(input);
-        output.hash()[..32].try_into().unwrap()
+        output.hash()[..32].into()
     }
 
     /// Anonymous VRF signature.
@@ -344,8 +344,7 @@ fn create_verifier(keys: &[u8]) -> Verifier {
                 .unwrap_or_else(|_| Public::from(RingProofParams::padding_point()))
         })
         .collect();
-    let verifier = Verifier::new(ring_size, keys);
-    verifier
+    Verifier::new(ring_size, keys)
 }
 
 // Return types are always starting with a byte representing either
@@ -370,18 +369,13 @@ const SIGNATURE_SIZE: usize = 784;
 
 /// Derive Private and Public Key from Seed
 ///
-/// returns: `Vec<u8>` containing the exit (1 byte) status followed by the (64 bytes) private key followed by the (32 bytes) public key
+/// returns: `Vec<u8>` containing the exit (1 byte) status followed by the (32 bytes) public key
 #[wasm_bindgen]
-pub fn derive_key_pair(seed: &[u8]) -> Vec<u8> {
-    let secret = Secret::from_seed(&seed);
+pub fn derive_public_key(seed: &[u8]) -> Vec<u8> {
+    let secret = Secret::from_seed(seed);
 
     let mut result = vec![RESULT_OK];
     let mut buf = Vec::new();
-    if secret.serialize_compressed(&mut buf).is_ok() {
-        result.extend(buf.clone());
-    } else {
-        return vec![RESULT_ERR];
-    }
     if secret.public().serialize_compressed(&mut buf).is_ok() {
         result.extend(buf);
     } else {
@@ -430,7 +424,7 @@ pub fn batch_verify_tickets(
 ) -> Vec<u8> {
     let verifier = create_verifier(keys);
     let chunk_size = vrf_input_data_len as usize + SIGNATURE_SIZE;
-    let proofs = tickets_data
+    tickets_data
         .chunks(chunk_size)
         .fold(vec![], |mut result, chunk| {
             let signature = &chunk[0..SIGNATURE_SIZE];
@@ -447,7 +441,5 @@ pub fn batch_verify_tickets(
                 }
             };
             result
-        });
-
-    proofs
+        })
 }
