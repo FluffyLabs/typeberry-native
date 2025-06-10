@@ -1,11 +1,11 @@
 {
-  "name": "bandersnatch-wasm",
+  "name": "@fluffylabs/bandersnatch",
   "version": "0.1.0",
   "files": [
-    "bandersnatch_wasm_bg.wasm",
-    "bandersnatch_wasm.js",
-    "bandersnatch_wasm.d.ts"
+    "bandersnatch_bg.wasm",
+    "bandersnatch.js",
+    "bandersnatch.d.ts"
   ],
-  "main": "bandersnatch_wasm.js",
-  "types": "bandersnatch_wasm.d.ts"
+  "main": "bandersnatch.js",
+  "types": "bandersnatch.d.ts"
 }
