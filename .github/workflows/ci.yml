@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    defaults:
+      run:
+        working-directory: ./
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - run: rustup component add rustfmt
+    - name: Install wasm-pack
+      run: cargo install wasm-pack
+    - name: Build WASM library (Node.js target)
+      run: wasm-pack build --target nodejs --scope fluffylabs
+    - name: Check formatting
+      run: cargo fmt --all --check -q
+    - name: Run tests
+      run: cargo test --verbose

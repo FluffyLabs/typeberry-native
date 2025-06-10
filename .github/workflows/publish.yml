@@ -1,0 +1,47 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22.x]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        registry-url: 'https://registry.npmjs.org'
+
+    - run: |
+        rustup install stable
+        rustup default stable
+        cargo install wasm-pack
+
+    - run: wasm-pack build --target nodejs --scope fluffylabs
+
+    - id: vars
+      run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Update version
+      working-directory: ./pkg
+      run: |
+        node -e "
+        const fs = require('fs');
+        const pkg = JSON.parse(fs.readFileSync('package.json'));
+        pkg.version = \`\${pkg.version.split('-')[0]}-${{ steps.vars.outputs.short_sha }}\`;
+        fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+        "
+
+    - name: Publish package
+      working-directory: ./pkg/
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      run: npm publish --access public
