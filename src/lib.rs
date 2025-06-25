@@ -2,13 +2,10 @@
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use ark_vrf::reexports::{
-    ark_serialize::{self, CanonicalDeserialize, CanonicalSerialize},
-};
+use ark_vrf::reexports::ark_serialize::{self, CanonicalDeserialize, CanonicalSerialize};
 use ark_vrf::suites::bandersnatch;
 use bandersnatch::{
-    BandersnatchSha512Ell2, IetfProof, Input, Output, Public, RingProof,
-    RingProofParams, Secret,
+    BandersnatchSha512Ell2, IetfProof, Input, Output, Public, RingProof, RingProofParams, Secret,
 };
 
 #[derive(Clone, Copy)]
@@ -51,7 +48,8 @@ fn ring_proof_params(ring_size: RingSize) -> &'static RingProofParams {
     let init = |size: usize| {
         use bandersnatch::PcsParams;
         let buf = include_bytes!("../data/zcash-srs-2-11-uncompressed.bin");
-        let pcs_params = PcsParams::deserialize_uncompressed_unchecked(&mut &buf[..]).expect("binary data invalid");
+        let pcs_params = PcsParams::deserialize_uncompressed_unchecked(&mut &buf[..])
+            .expect("binary data invalid");
         RingProofParams::from_pcs_params(size, pcs_params).expect("invalid ring proof params")
     };
 
@@ -108,7 +106,8 @@ impl Verifier {
     ) -> Result<[u8; 32], Error> {
         use ark_vrf::ring::Verifier as _;
 
-        let signature = RingVrfSignature::deserialize_compressed(signature).map_err(|_| Error::InvalidSignature)?;
+        let signature = RingVrfSignature::deserialize_compressed(signature)
+            .map_err(|_| Error::InvalidSignature)?;
 
         let input = vrf_input_point(vrf_input_data)?;
         let output = signature.output;
@@ -147,7 +146,8 @@ impl Verifier {
     ) -> Result<[u8; 32], Error> {
         use ark_vrf::ietf::Verifier as _;
 
-        let signature = IetfVrfSignature::deserialize_compressed(signature).map_err(|_| Error::InvalidSignature)?;
+        let signature = IetfVrfSignature::deserialize_compressed(signature)
+            .map_err(|_| Error::InvalidSignature)?;
 
         let input = vrf_input_point(vrf_input_data)?;
         let output = signature.output;
