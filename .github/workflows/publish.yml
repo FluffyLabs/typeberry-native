@@ -25,7 +25,7 @@ jobs:
         rustup default stable
         cargo install wasm-pack
 
-    - run: wasm-pack build --target bundler --scope fluffylabs
+    - run: wasm-pack build --target web --scope fluffylabs
 
     - id: vars
       run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
