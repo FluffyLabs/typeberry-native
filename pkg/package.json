@@ -5,13 +5,11 @@
   "files": [
     "reed_solomon_wasm_bg.wasm",
     "reed_solomon_wasm.js",
-    "reed_solomon_wasm_bg.js",
     "reed_solomon_wasm.d.ts"
   ],
   "main": "reed_solomon_wasm.js",
   "types": "reed_solomon_wasm.d.ts",
   "sideEffects": [
-    "./reed_solomon_wasm.js",
     "./snippets/*"
   ]
 }
