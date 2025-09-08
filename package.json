@@ -1,5 +1,5 @@
 {
     "scripts": {
-      "build": "wasm-pack build --target nodejs; rm ./pkg/.gitignore"
+      "build": "wasm-pack build --target bundler; rm ./pkg/.gitignore"
     }
   }
