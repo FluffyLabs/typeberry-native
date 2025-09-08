@@ -22,7 +22,7 @@ jobs:
     - name: Install wasm-pack
       run: cargo install wasm-pack
     - name: Build WASM library (Node.js target)
-      run: wasm-pack build --target nodejs --scope fluffylabs
+      run: wasm-pack build --target bundler --scope fluffylabs
     - name: Check formatting
       run: cargo fmt --all --check -q
     - name: Run tests
