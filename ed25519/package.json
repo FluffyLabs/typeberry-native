@@ -6,7 +6,7 @@
   "author": "Fluffy Labs",
   "license": "MPL-2.0",
   "scripts": {
-    "build": "wasm-pack build --target web",
+    "build": "wasm-pack build --target bundler",
     "lint": "cargo fmt --all --check -q",
     "test": "cargo test --verbose"
   }

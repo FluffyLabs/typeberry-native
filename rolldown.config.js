@@ -5,7 +5,9 @@ import { defineConfig } from 'rolldown';
 
 export default defineConfig({
   input: 'native/index.ts',
-  plugins: [wasm(), dts({
+  plugins: [wasm({
+    maxFileSize: 100000000
+  }), dts({
     resolve: true, // bundle all dependencies
   })],
   output: {
