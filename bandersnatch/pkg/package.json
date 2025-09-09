@@ -1,0 +1,17 @@
+{
+  "name": "bandersnatch",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "bandersnatch_bg.wasm",
+    "bandersnatch.js",
+    "bandersnatch_bg.js",
+    "bandersnatch.d.ts"
+  ],
+  "main": "bandersnatch.js",
+  "types": "bandersnatch.d.ts",
+  "sideEffects": [
+    "./bandersnatch.js",
+    "./snippets/*"
+  ]
+}
