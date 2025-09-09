@@ -9,7 +9,7 @@
     "native"
   ],
   "scripts": {
-    "build": "rolldown -c; cp ./native/package.json ./dist"
+    "build": "rolldown -c && cp ./native/package.json ./dist"
   },
   "engines": {
     "node": ">=22",

@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
+      - name: Install deps
+        run: npm ci
       - name: Use Rust
         run: rustup component add rustfmt
       - name: Install wasm-pack
