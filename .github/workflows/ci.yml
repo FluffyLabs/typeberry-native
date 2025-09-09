@@ -1,4 +1,4 @@
-name: CI
+name: Test and Build
 
 on:
   push:
@@ -9,21 +9,26 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    defaults:
-      run:
-        working-directory: ./
-
+  test-and-build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - run: rustup component add rustfmt
-    - name: Install wasm-pack
-      run: cargo install wasm-pack
-    - name: Build WASM library (Node.js target)
-      run: wasm-pack build --target web --scope fluffylabs
-    - name: Check formatting
-      run: cargo fmt --all --check -q
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - name: Install deps
+        run: npm ci
+      - name: Use Rust
+        run: rustup component add rustfmt
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+      - name: Check formatting
+        run: npm run lint --workspaces
+      - name: Run tests
+        run: npm run test --workspaces
+      - name: Build WASM library
+        run: npm run build --workspaces
+

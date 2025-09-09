@@ -1,6 +1,5 @@
-/target
-/www/.cache
-/www/.parcel-cache
-/www/dist
-/www/node_modules
-/pkg
+target
+node_modules
+pkg
+
+/dist

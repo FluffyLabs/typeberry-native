@@ -1,0 +1,19 @@
+[package]
+name = "reed-solomon-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+web-sys = { version = "0.3", features = ["console"] }
+wasm-bindgen = "0.2"
+reed-solomon = { package = "reed-solomon-simd", git = "https://github.com/ordian/reed-solomon-simd", branch = "simd-feature", default-features = false }
+
+[features]
+default = ["simd"]
+simd = ["reed-solomon/simd"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+lto = true

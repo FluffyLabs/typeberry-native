@@ -1,0 +1,13 @@
+{
+  "name": "@typeberry/bandersnatch",
+  "version": "0.0.1",
+  "main": "./pkg/bandersnatch.js",
+  "type": "module",
+  "author": "Fluffy Labs",
+  "license": "MPL-2.0",
+  "scripts": {
+    "build": "wasm-pack build --target bundler",
+    "lint": "cargo fmt --all --check -q",
+    "test": "cargo test --verbose"
+  }
+}
