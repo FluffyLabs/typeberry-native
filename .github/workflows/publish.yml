@@ -5,43 +5,40 @@ on:
   push:
     branches: [ "main" ]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   publish:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [22.x]
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        registry-url: 'https://registry.npmjs.org'
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+      - name: Build WASM library
+        run: npm run build --workspaces
+      - name: Build native library
+        run: npm run build
+      - id: vars
+        run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-    - run: |
-        rustup install stable
-        rustup default stable
-        cargo install wasm-pack
-
-    - run: wasm-pack build --target web --scope fluffylabs
-
-    - id: vars
-      run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-    - name: Update version
-      working-directory: ./pkg
-      run: |
-        node -e "
-        const fs = require('fs');
-        const pkg = JSON.parse(fs.readFileSync('package.json'));
-        pkg.version = \`\${pkg.version.split('-')[0]}-${{ steps.vars.outputs.short_sha }}\`;
-        fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-        "
-
-    - name: Publish package
-      working-directory: ./pkg/
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      run: npm publish --access public
+      - name: Update version
+        working-directory: ./dist
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json'));
+          pkg.version = \`\${pkg.version.split('-')[0]}-${{ steps.vars.outputs.short_sha }}\`;
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+      - name: Publish package
+        working-directory: ./dist/
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public

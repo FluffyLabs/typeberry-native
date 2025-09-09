@@ -1,0 +1,11 @@
+{
+  "name": "@typeberry/native",
+  "version": "0.0.1",
+  "main": "./index.js",
+  "type": "module",
+  "author": "Fluffy Labs",
+  "license": "MPL-2.0",
+  "scripts": {
+    "build": "true"
+  }
+}

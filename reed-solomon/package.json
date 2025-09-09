@@ -1,5 +1,13 @@
 {
+  "name": "@typeberry/reed-solomon",
+  "version": "0.0.1",
+  "main": "./pkg/reed_solomon_wasm.js",
+  "type": "module",
+  "author": "Fluffy Labs",
+  "license": "MPL-2.0",
   "scripts": {
-    "build": "wasm-pack build --target bundler"
+    "build": "wasm-pack build --target bundler",
+    "check": "cargo fmt --all --check -q",
+    "test": "cargo test --verbose"
   }
 }
