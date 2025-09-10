@@ -1,4 +1,4 @@
-use ed25519_dalek::{ed25519, Signature, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey, ed25519};
 use std::io::{self, Cursor, Read};
 use wasm_bindgen::prelude::wasm_bindgen;
 
