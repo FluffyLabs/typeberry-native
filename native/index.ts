@@ -9,8 +9,15 @@ import ed25519Wasm from "../ed25519/pkg/ed25519_wasm_bg.wasm";
 import reedSolomonInit from "@typeberry/reed-solomon";
 import reedSolomonWasm from "../reed-solomon/pkg/reed_solomon_wasm_bg.wasm";
 
-export const wasm = {
-  bandersnatch: await bandersnatchInit(await bandersnatchWasm()),
-  ed25519: await ed25519Init(await ed25519Wasm()),
-  reedSolomon: await reedSolomonInit(await reedSolomonWasm()),
+
+export async function initAll() {
+  await init.bandersnatch();
+  await init.ed25519();
+  await init.reedSolomon();
+}
+
+export const init = {
+  bandersnatch: async () => await bandersnatchInit(await bandersnatchWasm()),
+  ed25519: async () => await ed25519Init(await ed25519Wasm()),
+  reedSolomon: async () => await reedSolomonInit(await reedSolomonWasm()),
 };
