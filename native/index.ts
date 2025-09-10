@@ -9,6 +9,8 @@ import ed25519Wasm from "../ed25519/pkg/ed25519_wasm_bg.wasm";
 import reedSolomonInit from "@typeberry/reed-solomon";
 import reedSolomonWasm from "../reed-solomon/pkg/reed_solomon_wasm_bg.wasm";
 
-await bandersnatchInit(bandersnatchWasm);
-await ed25519Init(ed25519Wasm);
-await reedSolomonInit(reedSolomonWasm);
+export const wasm = {
+  bandersnatch: await bandersnatchInit(await bandersnatchWasm()),
+  ed25519: await ed25519Init(await ed25519Wasm()),
+  reedSolomon: await reedSolomonInit(await reedSolomonWasm()),
+};
