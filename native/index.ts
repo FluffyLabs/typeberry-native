@@ -17,7 +17,7 @@ export async function initAll() {
 }
 
 export const init = {
-  bandersnatch: async () => await bandersnatchInit(await bandersnatchWasm()),
-  ed25519: async () => await ed25519Init(await ed25519Wasm()),
-  reedSolomon: async () => await reedSolomonInit(await reedSolomonWasm()),
+  bandersnatch: async () => await bandersnatchInit({ module_or_path: await bandersnatchWasm()}),
+  ed25519: async () => await ed25519Init({ module_or_path: await ed25519Wasm()}),
+  reedSolomon: async () => await reedSolomonInit({ module_or_path: await reedSolomonWasm()}),
 };
