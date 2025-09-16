@@ -219,9 +219,9 @@ pub fn derive_public_key(seed: &[u8]) -> Vec<u8> {
 #[wasm_bindgen]
 pub fn verify_seal(
     signer_key: &[u8], // Signer public key (32 bytes)
-    seal_data: &[u8], // VRF Signature (96 bytes)
-    payload: &[u8],   // vrf_input_data (? bytes)
-    aux_data: &[u8],  // aux_data (? bytes)
+    seal_data: &[u8],  // VRF Signature (96 bytes)
+    payload: &[u8],    // vrf_input_data (? bytes)
+    aux_data: &[u8],   // aux_data (? bytes)
 ) -> Vec<u8> {
     let mut result = vec![];
     let public_key = deserialize_public_key(signer_key);
@@ -244,27 +244,28 @@ pub fn verify_seal(
 /// NOTE: the aux_data of VRF function is empty!
 #[wasm_bindgen]
 pub fn batch_verify_tickets(
-    ring_size: u32, // size of the ring (either tiny or full for now)
-    commitment: &[u8], // ring commitment (144 bytes)
+    ring_size: u32,          // size of the ring (either tiny or full for now)
+    commitment: &[u8],       // ring commitment (144 bytes)
     tickets_data: &[u8], // [proof/signature (784 bytes), vrf_input_data (? bytes); NO_OF_TICKETS]
     vrf_input_data_len: u32, // the data we prove over
 ) -> Vec<u8> {
     let chunk_size = vrf_input_data_len as usize + SIGNATURE_SIZE;
     let commitment = RingCommitment::deserialize_compressed(commitment).map_err(|_| ());
-    let ring_size = if ring_size as usize == RingSize::Full.size() { RingSize::Full } else { RingSize::Tiny };
+    let ring_size = if ring_size as usize == RingSize::Full.size() {
+        RingSize::Full
+    } else {
+        RingSize::Tiny
+    };
     tickets_data
         .chunks(chunk_size)
         .fold(vec![], |mut result, chunk| {
             let signature = &chunk[0..SIGNATURE_SIZE];
             let vrf_input_data = &chunk[SIGNATURE_SIZE..];
 
-            match commitment.clone().and_then(|commitment| Verifier::ring_vrf_verify(
-                ring_size,
-                commitment,
-                vrf_input_data,
-                &[],
-                signature
-            ).map_err(|_| ())) {
+            match commitment.clone().and_then(|commitment| {
+                Verifier::ring_vrf_verify(ring_size, commitment, vrf_input_data, &[], signature)
+                    .map_err(|_| ())
+            }) {
                 Ok(entropy) => {
                     result.push(RESULT_OK);
                     result.extend(entropy);
