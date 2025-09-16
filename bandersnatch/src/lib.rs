@@ -9,7 +9,7 @@ use bandersnatch::{
 };
 
 #[derive(Clone, Copy)]
-pub enum RingSize {
+enum RingSize {
     Tiny,
     Full,
 }
@@ -74,7 +74,7 @@ pub enum Error {
 type RingCommitment = ark_vrf::ring::RingCommitment<BandersnatchSha512Ell2>;
 
 // Verifier actor.
-pub struct Verifier;
+struct Verifier;
 impl Verifier {
     /// Anonymous VRF signature verification.
     ///
