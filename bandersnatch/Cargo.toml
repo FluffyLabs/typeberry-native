@@ -1,6 +1,6 @@
 [package]
 name = "bandersnatch"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 
 [dependencies]
@@ -12,12 +12,10 @@ hex = "0.4.3"
 
 web-sys = { version = "0.3", features = ["console"] }
 wasm-bindgen = "0.2"
-#
-#
-#
+
 # [patch."https://github.com/davxy/ring-proof"]
 # ring-proof = { package = "ring", git = "https://www.github.com/davxy/ring-proof.git", rev = "db13482" }
-#
+
 [lib]
 crate-type = ["cdylib"]
 

@@ -200,11 +200,21 @@ const RESULT_ERR: u8 = 1;
 const HASH_SIZE: usize = 32;
 
 #[wasm_bindgen]
-pub fn ring_commitment(keys: &[u8]) -> Vec<u8> {
+pub struct WasmVerifier {
+    verifier: Verifier,
+}
+
+#[wasm_bindgen]
+pub fn verifier(keys: &[u8]) -> WasmVerifier {
     let verifier = create_verifier(keys);
+    WasmVerifier {  verifier }
+}
+
+#[wasm_bindgen]
+pub fn ring_commitment(verifier: &WasmVerifier) -> Vec<u8> {
     let mut buf = Vec::new();
     buf.push(RESULT_OK);
-    match verifier.commitment.serialize_compressed(&mut buf) {
+    match verifier.verifier.commitment.serialize_compressed(&mut buf) {
         Ok(_) => buf,
         Err(_) => vec![RESULT_ERR],
     }
@@ -236,15 +246,14 @@ pub fn derive_public_key(seed: &[u8]) -> Vec<u8> {
 /// https://graypaper.fluffylabs.dev/#/68eaa1f/0e54010e5401?v=0.6.4
 #[wasm_bindgen]
 pub fn verify_seal(
-    keys: &[u8],
+    verifier: &WasmVerifier,
     signer_key_index: u32,
     seal_data: &[u8], // VRF Signature (96 bytes)
     payload: &[u8],   // vrf_input_data (? bytes)
     aux_data: &[u8],  // aux_data (? bytes)
 ) -> Vec<u8> {
     let mut result = vec![];
-    let verifier = create_verifier(keys);
-    match verifier.ietf_vrf_verify(payload, aux_data, seal_data, signer_key_index as usize) {
+    match verifier.verifier.ietf_vrf_verify(payload, aux_data, seal_data, signer_key_index as usize) {
         Ok(entropy) => {
             result.push(RESULT_OK);
             result.extend(entropy);
@@ -263,11 +272,10 @@ pub fn verify_seal(
 /// NOTE: the aux_data of VRF function is empty!
 #[wasm_bindgen]
 pub fn batch_verify_tickets(
-    keys: &[u8],
+    verifier: &WasmVerifier,
     tickets_data: &[u8], // [proof/signature (784 bytes), vrf_input_data (? bytes); NO_OF_TICKETS]
     vrf_input_data_len: u32, // the data we prove over
 ) -> Vec<u8> {
-    let verifier = create_verifier(keys);
     let chunk_size = vrf_input_data_len as usize + SIGNATURE_SIZE;
     tickets_data
         .chunks(chunk_size)
@@ -275,7 +283,7 @@ pub fn batch_verify_tickets(
             let signature = &chunk[0..SIGNATURE_SIZE];
             let vrf_input_data = &chunk[SIGNATURE_SIZE..];
 
-            match verifier.ring_vrf_verify(vrf_input_data, &[], signature) {
+            match verifier.verifier.ring_vrf_verify(vrf_input_data, &[], signature) {
                 Ok(entropy) => {
                     result.push(RESULT_OK);
                     result.extend(entropy);
