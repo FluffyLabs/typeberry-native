@@ -1,5 +1,7 @@
 //#![cfg_attr(not(feature = "std"), no_std)]
 
+use std::ops::Deref;
+
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use ark_vrf::reexports::ark_serialize::{self, CanonicalDeserialize, CanonicalSerialize};
@@ -9,7 +11,7 @@ use bandersnatch::{
 };
 
 #[derive(Clone, Copy)]
-enum RingSize {
+pub enum RingSize {
     Tiny,
     Full,
 }
@@ -74,7 +76,7 @@ pub enum Error {
 type RingCommitment = ark_vrf::ring::RingCommitment<BandersnatchSha512Ell2>;
 
 // Verifier actor.
-struct Verifier {
+pub struct Verifier {
     pub commitment: RingCommitment,
     pub ring: Vec<Public>,
     pub ring_size: RingSize,
@@ -204,6 +206,14 @@ pub struct WasmVerifier {
     verifier: Verifier,
 }
 
+impl Deref for WasmVerifier {
+    type Target = Verifier;
+
+    fn deref(&self) -> &Self::Target {
+        &self.verifier
+    }
+}
+
 #[wasm_bindgen]
 pub fn verifier(keys: &[u8]) -> WasmVerifier {
     let verifier = create_verifier(keys);
@@ -214,7 +224,7 @@ pub fn verifier(keys: &[u8]) -> WasmVerifier {
 pub fn ring_commitment(verifier: &WasmVerifier) -> Vec<u8> {
     let mut buf = Vec::new();
     buf.push(RESULT_OK);
-    match verifier.verifier.commitment.serialize_compressed(&mut buf) {
+    match verifier.commitment.serialize_compressed(&mut buf) {
         Ok(_) => buf,
         Err(_) => vec![RESULT_ERR],
     }
@@ -253,10 +263,7 @@ pub fn verify_seal(
     aux_data: &[u8],  // aux_data (? bytes)
 ) -> Vec<u8> {
     let mut result = vec![];
-    match verifier
-        .verifier
-        .ietf_vrf_verify(payload, aux_data, seal_data, signer_key_index as usize)
-    {
+    match verifier.ietf_vrf_verify(payload, aux_data, seal_data, signer_key_index as usize) {
         Ok(entropy) => {
             result.push(RESULT_OK);
             result.extend(entropy);
@@ -286,10 +293,7 @@ pub fn batch_verify_tickets(
             let signature = &chunk[0..SIGNATURE_SIZE];
             let vrf_input_data = &chunk[SIGNATURE_SIZE..];
 
-            match verifier
-                .verifier
-                .ring_vrf_verify(vrf_input_data, &[], signature)
-            {
+            match verifier.ring_vrf_verify(vrf_input_data, &[], signature) {
                 Ok(entropy) => {
                     result.push(RESULT_OK);
                     result.extend(entropy);
