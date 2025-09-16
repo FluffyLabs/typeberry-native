@@ -10,8 +10,7 @@ fn main() {
     println!("Testing ring commitment...");
     let keys = hex::decode(KEYS_HEX).unwrap();
     println!("Keys: 0x{}", hex::encode(&keys));
-    let verifier = verifier(&keys);
-    let commitment = ring_commitment(&verifier);
+    let commitment = ring_commitment(&keys);
     println!("Commitment: 0x{}", hex::encode(&commitment));
     assert_eq!(hex::encode(&commitment), EXPECTED_COMMITMENT);
 
