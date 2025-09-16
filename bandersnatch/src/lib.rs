@@ -207,7 +207,7 @@ pub struct WasmVerifier {
 #[wasm_bindgen]
 pub fn verifier(keys: &[u8]) -> WasmVerifier {
     let verifier = create_verifier(keys);
-    WasmVerifier {  verifier }
+    WasmVerifier { verifier }
 }
 
 #[wasm_bindgen]
@@ -253,7 +253,10 @@ pub fn verify_seal(
     aux_data: &[u8],  // aux_data (? bytes)
 ) -> Vec<u8> {
     let mut result = vec![];
-    match verifier.verifier.ietf_vrf_verify(payload, aux_data, seal_data, signer_key_index as usize) {
+    match verifier
+        .verifier
+        .ietf_vrf_verify(payload, aux_data, seal_data, signer_key_index as usize)
+    {
         Ok(entropy) => {
             result.push(RESULT_OK);
             result.extend(entropy);
@@ -283,7 +286,10 @@ pub fn batch_verify_tickets(
             let signature = &chunk[0..SIGNATURE_SIZE];
             let vrf_input_data = &chunk[SIGNATURE_SIZE..];
 
-            match verifier.verifier.ring_vrf_verify(vrf_input_data, &[], signature) {
+            match verifier
+                .verifier
+                .ring_vrf_verify(vrf_input_data, &[], signature)
+            {
                 Ok(entropy) => {
                     result.push(RESULT_OK);
                     result.extend(entropy);
