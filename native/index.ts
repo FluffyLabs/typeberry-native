@@ -16,8 +16,18 @@ export async function initAll() {
   await init.reedSolomon();
 }
 
+function initOnce<T>(doInit: (): Promise<T>) {
+  let ready = null;
+  return async () => {
+    if (ready === null) {
+      ready = doInit();
+    }
+    return await ready;
+  };
+}
+
 export const init = {
-  bandersnatch: async () => await bandersnatchInit({ module_or_path: await bandersnatchWasm()}),
-  ed25519: async () => await ed25519Init({ module_or_path: await ed25519Wasm()}),
-  reedSolomon: async () => await reedSolomonInit({ module_or_path: await reedSolomonWasm()}),
+  bandersnatch: initOnce(async () => await bandersnatchInit({ module_or_path: await bandersnatchWasm()})),
+  ed25519: initOnce(async () => await ed25519Init({ module_or_path: await ed25519Wasm()})),
+  reedSolomon: initOnce(async () => await reedSolomonInit({ module_or_path: await reedSolomonWasm()})),
 };
