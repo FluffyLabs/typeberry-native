@@ -74,32 +74,16 @@ pub enum Error {
 type RingCommitment = ark_vrf::ring::RingCommitment<BandersnatchSha512Ell2>;
 
 // Verifier actor.
-struct Verifier {
-    pub commitment: RingCommitment,
-    pub ring: Vec<Public>,
-    pub ring_size: RingSize,
-}
-
+struct Verifier;
 impl Verifier {
-    fn new(ring_size: RingSize, ring: Vec<Public>) -> Self {
-        // Backend currently requires the wrapped type (plain affine points)
-        let pts: Vec<_> = ring.iter().map(|pk| pk.0).collect();
-        let verifier_key = ring_proof_params(ring_size).verifier_key(&pts);
-        let commitment = verifier_key.commitment();
-        Self {
-            ring,
-            commitment,
-            ring_size,
-        }
-    }
-
     /// Anonymous VRF signature verification.
     ///
     /// Used for tickets verification.
     ///
     /// On success returns the VRF output hash.
     pub fn ring_vrf_verify(
-        &self,
+        ring_size: RingSize,
+        commitment: RingCommitment,
         vrf_input_data: &[u8],
         aux_data: &[u8],
         signature: &[u8],
@@ -112,14 +96,14 @@ impl Verifier {
         let input = vrf_input_point(vrf_input_data)?;
         let output = signature.output;
 
-        let ring_params = ring_proof_params(self.ring_size);
+        let ring_params = ring_proof_params(ring_size);
 
         // The verifier key is reconstructed from the commitment and the constant
         // verifier key component of the SRS in order to verify some proof.
         // As an alternative we can construct the verifier key using the
         // RingContext::verifier_key() method, but is more expensive.
         // In other words, we prefer computing the commitment once, when the keyset changes.
-        let verifier_key = ring_params.verifier_key_from_commitment(self.commitment.clone());
+        let verifier_key = ring_params.verifier_key_from_commitment(commitment);
         let verifier = ring_params.verifier(verifier_key);
         if Public::verify(input, output, aux_data, &signature.proof, &verifier).is_err() {
             println!("Ring signature verification failure");
@@ -138,11 +122,10 @@ impl Verifier {
     ///
     /// On success returns the VRF output hash.
     pub fn ietf_vrf_verify(
-        &self,
         vrf_input_data: &[u8],
         aux_data: &[u8],
         signature: &[u8],
-        signer_key_index: usize,
+        signer_public_key: Public,
     ) -> Result<[u8; 32], Error> {
         use ark_vrf::ietf::Verifier as _;
 
@@ -152,8 +135,7 @@ impl Verifier {
         let input = vrf_input_point(vrf_input_data)?;
         let output = signature.output;
 
-        let public = &self.ring[signer_key_index];
-        if public
+        if signer_public_key
             .verify(input, output, aux_data, &signature.proof)
             .is_err()
         {
@@ -176,35 +158,35 @@ fn vrf_output_hash(output: Output) -> [u8; 32] {
     vrf_output_hash
 }
 
-fn create_verifier(keys: &[u8]) -> Verifier {
-    let ring_size = if keys.len() / HASH_SIZE == RingSize::Full.size() {
-        RingSize::Full
-    } else {
-        RingSize::Tiny
-    };
-    let keys = keys
-        .chunks(HASH_SIZE)
-        .map(|chunk| {
-            Public::deserialize_compressed(chunk)
-                .unwrap_or_else(|_| Public::from(RingProofParams::padding_point()))
-        })
-        .collect();
-    Verifier::new(ring_size, keys)
-}
-
 // Return types are always starting with a byte representing either
 // OK or ERROR code.
 const RESULT_OK: u8 = 0;
 const RESULT_ERR: u8 = 1;
 
-const HASH_SIZE: usize = 32;
+const PUBLIC_KEY_SIZE: usize = 32;
 
+fn deserialize_public_key(chunk: &[u8]) -> Public {
+    Public::deserialize_compressed(chunk)
+        .unwrap_or_else(|_| Public::from(RingProofParams::padding_point()))
+}
+/// Generate ring commitment given concatenation of ring keys.
 #[wasm_bindgen]
 pub fn ring_commitment(keys: &[u8]) -> Vec<u8> {
-    let verifier = create_verifier(keys);
+    let ring_size = if keys.len() / PUBLIC_KEY_SIZE == RingSize::Full.size() {
+        RingSize::Full
+    } else {
+        RingSize::Tiny
+    };
+    let pts: Vec<_> = keys
+        .chunks(PUBLIC_KEY_SIZE)
+        .map(deserialize_public_key)
+        .map(|pk| pk.0)
+        .collect();
+    let verifier_key = ring_proof_params(ring_size).verifier_key(&pts);
+    let commitment = verifier_key.commitment();
     let mut buf = Vec::new();
     buf.push(RESULT_OK);
-    match verifier.commitment.serialize_compressed(&mut buf) {
+    match commitment.serialize_compressed(&mut buf) {
         Ok(_) => buf,
         Err(_) => vec![RESULT_ERR],
     }
@@ -236,15 +218,14 @@ pub fn derive_public_key(seed: &[u8]) -> Vec<u8> {
 /// https://graypaper.fluffylabs.dev/#/68eaa1f/0e54010e5401?v=0.6.4
 #[wasm_bindgen]
 pub fn verify_seal(
-    keys: &[u8],
-    signer_key_index: u32,
-    seal_data: &[u8], // VRF Signature (96 bytes)
-    payload: &[u8],   // vrf_input_data (? bytes)
-    aux_data: &[u8],  // aux_data (? bytes)
+    signer_key: &[u8], // Signer public key (32 bytes)
+    seal_data: &[u8],  // VRF Signature (96 bytes)
+    payload: &[u8],    // vrf_input_data (? bytes)
+    aux_data: &[u8],   // aux_data (? bytes)
 ) -> Vec<u8> {
     let mut result = vec![];
-    let verifier = create_verifier(keys);
-    match verifier.ietf_vrf_verify(payload, aux_data, seal_data, signer_key_index as usize) {
+    let public_key = deserialize_public_key(signer_key);
+    match Verifier::ietf_vrf_verify(payload, aux_data, seal_data, public_key) {
         Ok(entropy) => {
             result.push(RESULT_OK);
             result.extend(entropy);
@@ -263,24 +244,33 @@ pub fn verify_seal(
 /// NOTE: the aux_data of VRF function is empty!
 #[wasm_bindgen]
 pub fn batch_verify_tickets(
-    keys: &[u8],
+    ring_size: u32,          // size of the ring (either tiny or full for now)
+    commitment: &[u8],       // ring commitment (144 bytes)
     tickets_data: &[u8], // [proof/signature (784 bytes), vrf_input_data (? bytes); NO_OF_TICKETS]
     vrf_input_data_len: u32, // the data we prove over
 ) -> Vec<u8> {
-    let verifier = create_verifier(keys);
     let chunk_size = vrf_input_data_len as usize + SIGNATURE_SIZE;
+    let commitment = RingCommitment::deserialize_compressed(commitment).map_err(|_| ());
+    let ring_size = if ring_size as usize == RingSize::Full.size() {
+        RingSize::Full
+    } else {
+        RingSize::Tiny
+    };
     tickets_data
         .chunks(chunk_size)
         .fold(vec![], |mut result, chunk| {
             let signature = &chunk[0..SIGNATURE_SIZE];
             let vrf_input_data = &chunk[SIGNATURE_SIZE..];
 
-            match verifier.ring_vrf_verify(vrf_input_data, &[], signature) {
+            match commitment.clone().and_then(|commitment| {
+                Verifier::ring_vrf_verify(ring_size, commitment, vrf_input_data, &[], signature)
+                    .map_err(|_| ())
+            }) {
                 Ok(entropy) => {
                     result.push(RESULT_OK);
                     result.extend(entropy);
                 }
-                Err(_) => {
+                Err(()) => {
                     result.push(RESULT_ERR);
                     result.extend([0u8; 32]);
                 }
