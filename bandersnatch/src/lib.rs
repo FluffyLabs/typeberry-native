@@ -8,6 +8,8 @@ use bandersnatch::{
     BandersnatchSha512Ell2, IetfProof, Input, Output, Public, RingProof, RingProofParams, Secret,
 };
 
+mod test;
+
 #[derive(Clone, Copy)]
 enum RingSize {
     Tiny,
