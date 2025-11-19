@@ -13,7 +13,9 @@ fn main() {
     let message = hex::decode(MESSAGE_HEX).unwrap();
     println!("Message: 0x{}", hex::encode(&message));
     let message_len = message.len() as u8;
+    println!("Message len: 0x{}", &message_len);
     let data = &[key, signature, vec![message_len], message].concat();
+    println!("Data: 0x{}", hex::encode(&data));
     let verify_ed25519_result = verify_ed25519(&data.clone());
     println!("verify_ed25519 result: {:?}", verify_ed25519_result);
     let verify_ed25519_batch_result = verify_ed25519_batch(&data.clone());

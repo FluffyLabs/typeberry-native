@@ -5,9 +5,9 @@ edition = "2024"
 
 [dependencies]
 hex = "0.4.3"
-ed25519-dalek = { version = "2", features = ["batch"] }
 web-sys = { version = "0.3", features = ["console"] }
 wasm-bindgen = "0.2"
+ed25519-consensus = "2.1.0"
 
 [lib]
 crate-type = ["cdylib"]
