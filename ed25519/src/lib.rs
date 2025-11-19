@@ -35,7 +35,6 @@ pub fn verify_ed25519(
 }
 
 /**
- * @obsolete
  * ed25519-consensus doesn't have built-in batch verification.
  */
 #[wasm_bindgen]
