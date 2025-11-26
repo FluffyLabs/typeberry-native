@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::ring_commitment;
+    use crate::{derive_public_key, generate_seal, ring_commitment, verify_seal};
 
     #[test]
     fn should_get_ring_commitment() {
@@ -25,5 +25,77 @@ mod tests {
         );
 
         assert_eq!(hex::encode(&commitment), hex::encode(&commitment2));
+    }
+
+    #[test]
+    fn should_derive_public_key_from_seed() {
+        let seed = b"example seed";
+
+        let result = derive_public_key(seed);
+
+        let status = result[0];
+        let public_key = &result[1..];
+
+        assert_eq!(status, 0);
+        assert_eq!(
+            hex::encode(public_key),
+            "a777e887df9b783c6734140cdd95f74615bfd083ec8189c98ef5e3892f1a2ac1"
+        );
+    }
+
+    #[test]
+    fn should_generate_correct_seal() {
+        let seed = b"example seed";
+        let input = b"example input";
+        let aux_data = b"example aux data";
+        let result = generate_seal(seed, input, aux_data);
+        let status = result[0];
+        let seal = &result[1..];
+
+        assert_eq!(status, 0);
+        assert_eq!(
+            hex::encode(seal),
+            "5a997d4d260d49d2e4e02d3f2aae9a2beeea52e7678be6589694bf83677cb7d85e383d4c699839a21a15f01e44d4d585190372d889110ea192337e4b87c7b419932bf668597b49bb4797f64bcbe843deb96393722cbfcc2c80365b483826531c"
+        );
+    }
+
+    #[test]
+    fn should_verify_correct_seal_and_return_id() {
+        let pub_key =
+            hex::decode("a777e887df9b783c6734140cdd95f74615bfd083ec8189c98ef5e3892f1a2ac1")
+                .unwrap();
+        let seal = hex::decode("5a997d4d260d49d2e4e02d3f2aae9a2beeea52e7678be6589694bf83677cb7d85e383d4c699839a21a15f01e44d4d585190372d889110ea192337e4b87c7b419932bf668597b49bb4797f64bcbe843deb96393722cbfcc2c80365b483826531c").unwrap();
+        let input = b"example input";
+        let aux_data = b"example aux data";
+
+        let result = verify_seal(&pub_key, &seal, input, aux_data);
+        let status = result[0];
+        let id = &result[1..];
+
+        assert_eq!(status, 0);
+        assert_eq!(
+            hex::encode(id),
+            "5814cea12deefefd92c497453ac7defdcacabce180074926251d8f00e420a841"
+        );
+    }
+
+    #[test]
+    fn should_verify_incorrect_seal_and_return_error() {
+        let incorrect_pub_key =
+            hex::decode("b777e887df9b783c6734140cdd95f74615bfd083ec8189c98ef5e3892f1a2ac1")
+                .unwrap();
+        let seal = hex::decode("5a997d4d260d49d2e4e02d3f2aae9a2beeea52e7678be6589694bf83677cb7d85e383d4c699839a21a15f01e44d4d585190372d889110ea192337e4b87c7b419932bf668597b49bb4797f64bcbe843deb96393722cbfcc2c80365b483826531c").unwrap();
+        let input = b"example input";
+        let aux_data = b"example aux data";
+
+        let result = verify_seal(&incorrect_pub_key, &seal, input, aux_data);
+        let status = result[0];
+        let id = &result[1..];
+
+        assert_eq!(status, 1);
+        assert_eq!(
+            hex::encode(id),
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        );
     }
 }

@@ -2,6 +2,7 @@
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
+use ark_vrf::ietf::Prover;
 use ark_vrf::reexports::ark_serialize::{self, CanonicalDeserialize, CanonicalSerialize};
 use ark_vrf::suites::bandersnatch;
 use bandersnatch::{
@@ -237,6 +238,58 @@ pub fn verify_seal(
             result.extend([0u8; 32]);
         }
     }
+    result
+}
+
+/// Generate seal that is verifiable using `verify_seal` function.
+///
+/// # Arguments
+/// * `secret_seed` - Seed used to derive the secret key
+/// * `input` - VRF input data
+/// * `aux_data` - Auxiliary data for the VRF proof
+///
+/// # Returns
+/// A byte vector with the following format:
+/// - On success (97 bytes):
+///   - Byte 0: Status code `0` (RESULT_OK)
+///   - Bytes 1-32: Serialized VRF output (32 bytes, compressed)
+///   - Bytes 33-96: Serialized IETF VRF proof (64 bytes, compressed)
+/// - On error (1 byte):
+///   - Byte 0: Status code `1` (RESULT_ERR)
+///
+/// Returns an error if the input cannot be converted to a valid VRF input point
+/// or if serialization of the output or proof fails.
+#[wasm_bindgen]
+pub fn generate_seal(secret_seed: &[u8], input: &[u8], aux_data: &[u8]) -> Vec<u8> {
+    // helper to serialize a CanonicalSerialize object into a Vec<u8>
+    fn serialize_compressed_to_vec<T: CanonicalSerialize>(obj: &T) -> Result<Vec<u8>, ()> {
+        let mut buf = Vec::new();
+        obj.serialize_compressed(&mut buf)
+            .map(|_| buf)
+            .map_err(|_| ())
+    }
+
+    let secret = Secret::from_seed(secret_seed);
+    let input_point = match Input::new(input) {
+        Some(i) => i,
+        None => return vec![RESULT_ERR],
+    };
+
+    let output = secret.output(input_point);
+    let proof = secret.prove(input_point, output, aux_data);
+
+    let mut result = vec![RESULT_OK];
+
+    match serialize_compressed_to_vec(&output) {
+        Ok(mut v) => result.append(&mut v),
+        Err(_) => return vec![RESULT_ERR],
+    }
+
+    match serialize_compressed_to_vec(&proof) {
+        Ok(mut v) => result.append(&mut v),
+        Err(_) => return vec![RESULT_ERR],
+    }
+
     result
 }
 
