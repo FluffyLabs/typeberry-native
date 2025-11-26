@@ -23,7 +23,7 @@ fn main() {
     println!("Public key: {}", hex::encode(public_key));
     assert_eq!(hex::encode(public_key), EXPECTED_PUBLIC_KEY);
 
-    println!("Testing seal geneation...");
+    println!("Testing seal generation...");
     let seed = b"example seed";
     let input = b"example input";
     let aux_data = b"example aux data";
