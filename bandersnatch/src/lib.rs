@@ -2,6 +2,7 @@
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
+use ark_vrf::ietf::Prover;
 use ark_vrf::reexports::ark_serialize::{self, CanonicalDeserialize, CanonicalSerialize};
 use ark_vrf::suites::bandersnatch;
 use bandersnatch::{
@@ -237,6 +238,41 @@ pub fn verify_seal(
             result.extend([0u8; 32]);
         }
     }
+    result
+}
+
+/// Generate seal that is verifiable using `verify_seal` function.
+#[wasm_bindgen]
+pub fn generate_seal(secret_seed: &[u8], input: &[u8], aux_data: &[u8]) -> Vec<u8> {
+    // helper to serialize a CanonicalSerialize object into a Vec<u8>
+    fn serialize_compressed_to_vec<T: CanonicalSerialize>(obj: &T) -> Result<Vec<u8>, ()> {
+        let mut buf = Vec::new();
+        obj.serialize_compressed(&mut buf)
+            .map(|_| buf)
+            .map_err(|_| ())
+    }
+
+    let secret = Secret::from_seed(secret_seed);
+    let input_point = match Input::new(input) {
+        Some(i) => i,
+        None => return vec![RESULT_ERR],
+    };
+
+    let output = secret.output(input_point);
+    let proof = secret.prove(input_point, output, aux_data);
+
+    let mut result = Vec::new();
+
+    match serialize_compressed_to_vec(&output) {
+        Ok(mut v) => result.append(&mut v),
+        Err(_) => return vec![RESULT_ERR],
+    }
+
+    match serialize_compressed_to_vec(&proof) {
+        Ok(mut v) => result.append(&mut v),
+        Err(_) => return vec![RESULT_ERR],
+    }
+
     result
 }
 

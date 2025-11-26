@@ -22,4 +22,15 @@ fn main() {
     let public_key = &key[1..];
     println!("Public key: {}", hex::encode(public_key));
     assert_eq!(hex::encode(public_key), EXPECTED_PUBLIC_KEY);
+
+    println!("Testing seal geneation...");
+    let seed = b"example seed";
+    let input = b"example input";
+    let aux_data = b"example aux data";
+    let seal = generate_seal(seed, input, aux_data);
+    println!("Seal: 0x{}", hex::encode(&seal));
+
+    let pub_key = derive_public_key(seed);
+    let result = verify_seal(&pub_key[1..], &seal, input, aux_data);
+    println!("Result: 0x{}", hex::encode(&result));
 }
