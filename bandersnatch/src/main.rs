@@ -32,5 +32,5 @@ fn main() {
 
     let pub_key = derive_public_key(seed);
     let result = verify_seal(&pub_key[1..], &seal, input, aux_data);
-    println!("Result: 0x{}", hex::encode(&result));
+    println!("Result: 0x{}", hex::encode(&result[1..]));
 }

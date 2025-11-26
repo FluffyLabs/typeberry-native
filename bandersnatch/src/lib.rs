@@ -261,7 +261,7 @@ pub fn generate_seal(secret_seed: &[u8], input: &[u8], aux_data: &[u8]) -> Vec<u
     let output = secret.output(input_point);
     let proof = secret.prove(input_point, output, aux_data);
 
-    let mut result = Vec::new();
+    let mut result = vec![RESULT_OK];
 
     match serialize_compressed_to_vec(&output) {
         Ok(mut v) => result.append(&mut v),
