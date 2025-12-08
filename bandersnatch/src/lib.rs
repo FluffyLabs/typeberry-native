@@ -115,7 +115,7 @@ impl Verifier {
         println!("Ring signature verified");
 
         // This truncated hash is the actual value used as ticket-id/score in JAM
-        Ok(vrf_output_hash(output))
+        Ok(copy_vrf_output_hash(output))
     }
 
     /// Non-Anonymous VRF signature verification.
@@ -150,11 +150,11 @@ impl Verifier {
         // This is the actual value used as ticket-id/score
         // NOTE: as far as vrf_input_data is the same, this matches the one produced
         // using the ring-vrf (regardless of aux_data).
-        Ok(vrf_output_hash(output))
+        Ok(copy_vrf_output_hash(output))
     }
 }
 
-fn vrf_output_hash(output: Output) -> [u8; 32] {
+fn copy_vrf_output_hash(output: Output) -> [u8; 32] {
     let mut vrf_output_hash = [0u8; 32];
     vrf_output_hash.copy_from_slice(&output.hash()[..32]);
     println!(" vrf-output-hash: {}", hex::encode(vrf_output_hash));
@@ -284,7 +284,7 @@ pub fn generate_seal(secret_seed: &[u8], input: &[u8], aux_data: &[u8]) -> Vec<u
 
 /// Compute VRF output hash from a secret seed and input data.
 ///
-/// This function derives a deterministic VRF output without generating a proof.
+/// This function derives a deterministic VRF output hash without generating a proof.
 /// Unlike `generate_seal`, this produces only the output hash, not a verifiable signature.
 ///
 /// # Arguments
@@ -301,7 +301,7 @@ pub fn generate_seal(secret_seed: &[u8], input: &[u8], aux_data: &[u8]) -> Vec<u
 ///
 /// Returns an error if the input cannot be converted to a valid VRF input point.
 #[wasm_bindgen]
-pub fn vrf_output(secret_seed: &[u8], input: &[u8]) -> Vec<u8> {
+pub fn vrf_output_hash(secret_seed: &[u8], input: &[u8]) -> Vec<u8> {
     let secret = Secret::from_seed(secret_seed);
     let input_point = match Input::new(input) {
         Some(i) => i,
@@ -311,7 +311,7 @@ pub fn vrf_output(secret_seed: &[u8], input: &[u8]) -> Vec<u8> {
     let output = secret.output(input_point);
 
     let mut result = vec![RESULT_OK];
-    result.extend_from_slice(&vrf_output_hash(output));
+    result.extend_from_slice(&copy_vrf_output_hash(output));
     result
 }
 
