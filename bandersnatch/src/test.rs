@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{derive_public_key, generate_seal, ring_commitment, verify_seal, vrf_output};
+    use crate::{derive_public_key, generate_seal, ring_commitment, verify_seal, vrf_output_hash};
 
     #[test]
     fn should_get_ring_commitment() {
@@ -126,7 +126,7 @@ mod tests {
         assert_eq!(pub_key_result[0], 0);
         let pub_key = &pub_key_result[1..];
 
-        let entropy = vrf_output(&seed, input);
+        let entropy = vrf_output_hash(&seed, input);
         assert_eq!(entropy[0], 0);
 
         let seal_result = generate_seal(&seed, input, aux_data);
