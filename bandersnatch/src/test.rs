@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{derive_public_key, generate_seal, ring_commitment, verify_seal};
+    use crate::{derive_public_key, generate_seal, ring_commitment, verify_seal, vrf_output};
 
     #[test]
     fn should_get_ring_commitment() {
@@ -42,6 +42,23 @@ mod tests {
             "a777e887df9b783c6734140cdd95f74615bfd083ec8189c98ef5e3892f1a2ac1"
         );
     }
+
+    #[test]
+    fn should_derive_public_key_from_seed2() {
+        let seed = hex::decode("007596986419e027e65499cc87027a236bf4a78b5e8bd7f675759d73e7a9c799").unwrap();
+
+        let result = derive_public_key(&seed);
+
+        let status = result[0];
+        let public_key = &result[1..];
+
+        assert_eq!(status, 0);
+        assert_eq!(
+            hex::encode(public_key),
+            "ff71c6c03ff88adb5ed52c9681de1629a54e702fc14729f6b50d2f0a76f185b3"
+        );
+    }
+
 
     #[test]
     fn should_generate_correct_seal() {
@@ -97,5 +114,27 @@ mod tests {
             hex::encode(id),
             "0000000000000000000000000000000000000000000000000000000000000000"
         );
+    }
+
+    #[test]
+    fn should_generate_seal_and_verify_it() {
+        let seed = hex::decode("007596986419e027e65499cc87027a236bf4a78b5e8bd7f675759d73e7a9c799").unwrap();
+        let input = b"test input data";
+        let aux_data = b"test auxiliary data";
+
+        let pub_key_result = derive_public_key(&seed);
+        assert_eq!(pub_key_result[0], 0);
+        let pub_key = &pub_key_result[1..];
+
+        let entropy = vrf_output(&seed, input);
+        assert_eq!(entropy[0], 0);
+
+        let seal_result = generate_seal(&seed, input, aux_data);
+        assert_eq!(seal_result[0], 0);
+
+        let verify_result = verify_seal(pub_key, &seal_result[1..], input, aux_data);
+        assert_eq!(verify_result[0], 0);
+
+        assert_eq!(entropy, verify_result);
     }
 }
