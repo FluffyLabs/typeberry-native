@@ -271,10 +271,7 @@ pub fn generate_seal(secret_seed: &[u8], input: &[u8], aux_data: &[u8]) -> Vec<u
     let proof = secret.prove(input_point, output, aux_data);
 
     let mut result = vec![RESULT_OK];
-    let sig = IetfVrfSignature{
-        output,
-        proof
-    };
+    let sig = IetfVrfSignature { output, proof };
 
     match sig.serialize_compressed(&mut result) {
         Ok(_) => result,

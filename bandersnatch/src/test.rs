@@ -45,7 +45,8 @@ mod tests {
 
     #[test]
     fn should_derive_public_key_from_seed2() {
-        let seed = hex::decode("007596986419e027e65499cc87027a236bf4a78b5e8bd7f675759d73e7a9c799").unwrap();
+        let seed = hex::decode("007596986419e027e65499cc87027a236bf4a78b5e8bd7f675759d73e7a9c799")
+            .unwrap();
 
         let result = derive_public_key(&seed);
 
@@ -58,7 +59,6 @@ mod tests {
             "ff71c6c03ff88adb5ed52c9681de1629a54e702fc14729f6b50d2f0a76f185b3"
         );
     }
-
 
     #[test]
     fn should_generate_correct_seal() {
@@ -118,7 +118,8 @@ mod tests {
 
     #[test]
     fn should_generate_seal_and_verify_it() {
-        let seed = hex::decode("007596986419e027e65499cc87027a236bf4a78b5e8bd7f675759d73e7a9c799").unwrap();
+        let seed = hex::decode("007596986419e027e65499cc87027a236bf4a78b5e8bd7f675759d73e7a9c799")
+            .unwrap();
         let input = b"test input data";
         let aux_data = b"test auxiliary data";
 
