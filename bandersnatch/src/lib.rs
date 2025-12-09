@@ -115,7 +115,7 @@ impl Verifier {
         println!("Ring signature verified");
 
         // This truncated hash is the actual value used as ticket-id/score in JAM
-        Ok(vrf_output_hash(output))
+        Ok(copy_vrf_output_hash(output))
     }
 
     /// Non-Anonymous VRF signature verification.
@@ -150,11 +150,11 @@ impl Verifier {
         // This is the actual value used as ticket-id/score
         // NOTE: as far as vrf_input_data is the same, this matches the one produced
         // using the ring-vrf (regardless of aux_data).
-        Ok(vrf_output_hash(output))
+        Ok(copy_vrf_output_hash(output))
     }
 }
 
-fn vrf_output_hash(output: Output) -> [u8; 32] {
+fn copy_vrf_output_hash(output: Output) -> [u8; 32] {
     let mut vrf_output_hash = [0u8; 32];
     vrf_output_hash.copy_from_slice(&output.hash()[..32]);
     println!(" vrf-output-hash: {}", hex::encode(vrf_output_hash));
@@ -252,7 +252,7 @@ pub fn verify_seal(
 /// A byte vector with the following format:
 /// - On success (97 bytes):
 ///   - Byte 0: Status code `0` (RESULT_OK)
-///   - Bytes 1-32: Serialized VRF output (32 bytes, compressed)
+///   - Bytes 1-32: Serialized VRF output (32 bytes, compressed) NOTE: not output hash!
 ///   - Bytes 33-96: Serialized IETF VRF proof (64 bytes, compressed)
 /// - On error (1 byte):
 ///   - Byte 0: Status code `1` (RESULT_ERR)
@@ -261,14 +261,6 @@ pub fn verify_seal(
 /// or if serialization of the output or proof fails.
 #[wasm_bindgen]
 pub fn generate_seal(secret_seed: &[u8], input: &[u8], aux_data: &[u8]) -> Vec<u8> {
-    // helper to serialize a CanonicalSerialize object into a Vec<u8>
-    fn serialize_compressed_to_vec<T: CanonicalSerialize>(obj: &T) -> Result<Vec<u8>, ()> {
-        let mut buf = Vec::new();
-        obj.serialize_compressed(&mut buf)
-            .map(|_| buf)
-            .map_err(|_| ())
-    }
-
     let secret = Secret::from_seed(secret_seed);
     let input_point = match Input::new(input) {
         Some(i) => i,
@@ -279,17 +271,44 @@ pub fn generate_seal(secret_seed: &[u8], input: &[u8], aux_data: &[u8]) -> Vec<u
     let proof = secret.prove(input_point, output, aux_data);
 
     let mut result = vec![RESULT_OK];
+    let sig = IetfVrfSignature { output, proof };
 
-    match serialize_compressed_to_vec(&output) {
-        Ok(mut v) => result.append(&mut v),
-        Err(_) => return vec![RESULT_ERR],
+    match sig.serialize_compressed(&mut result) {
+        Ok(_) => result,
+        Err(_) => vec![RESULT_ERR],
     }
+}
 
-    match serialize_compressed_to_vec(&proof) {
-        Ok(mut v) => result.append(&mut v),
-        Err(_) => return vec![RESULT_ERR],
-    }
+/// Compute VRF output hash from a secret seed and input data.
+///
+/// This function derives a deterministic VRF output hash without generating a proof.
+/// Unlike `generate_seal`, this produces only the output hash, not a verifiable signature.
+///
+/// # Arguments
+/// * `secret_seed` - Seed used to derive the secret key
+/// * `input` - VRF input data to be hashed
+///
+/// # Returns
+/// A byte vector with the following format:
+/// - On success (33 bytes):
+///   - Byte 0: Status code `0` (RESULT_OK)
+///   - Bytes 1-32: VRF output hash (32 bytes)
+/// - On error (1 byte):
+///   - Byte 0: Status code `1` (RESULT_ERR)
+///
+/// Returns an error if the input cannot be converted to a valid VRF input point.
+#[wasm_bindgen]
+pub fn vrf_output_hash(secret_seed: &[u8], input: &[u8]) -> Vec<u8> {
+    let secret = Secret::from_seed(secret_seed);
+    let input_point = match Input::new(input) {
+        Some(i) => i,
+        None => return vec![RESULT_ERR],
+    };
 
+    let output = secret.output(input_point);
+
+    let mut result = vec![RESULT_OK];
+    result.extend_from_slice(&copy_vrf_output_hash(output));
     result
 }
 
