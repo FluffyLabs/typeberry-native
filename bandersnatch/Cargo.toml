@@ -4,17 +4,14 @@ version = "0.2.0"
 edition = "2024"
 
 [dependencies]
-ark-vrf = { git = "https://github.com/davxy/ark-vrf.git", default-features = false, features = [
+ark-vrf = { version = "0.1.1", features = [
     "bandersnatch",
     "ring",
-], rev = "29e53a0" }
+] }
 hex = "0.4.3"
 
 web-sys = { version = "0.3", features = ["console"] }
 wasm-bindgen = "0.2"
-
-# [patch."https://github.com/davxy/ring-proof"]
-# ring-proof = { package = "ring", git = "https://www.github.com/davxy/ring-proof.git", rev = "db13482" }
 
 [lib]
 crate-type = ["cdylib"]
