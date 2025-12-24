@@ -93,7 +93,7 @@ impl Verifier {
     ) -> Result<[u8; 32], Error> {
         use ark_vrf::ring::Verifier as _;
 
-        let signature = RingVrfSignature::deserialize_compressed(signature)
+        let signature = RingVrfSignature::deserialize_compressed_unchecked(signature)
             .map_err(|_| Error::InvalidSignature)?;
 
         let input = vrf_input_point(vrf_input_data)?;
@@ -132,7 +132,7 @@ impl Verifier {
     ) -> Result<[u8; 32], Error> {
         use ark_vrf::ietf::Verifier as _;
 
-        let signature = IetfVrfSignature::deserialize_compressed(signature)
+        let signature = IetfVrfSignature::deserialize_compressed_unchecked(signature)
             .map_err(|_| Error::InvalidSignature)?;
 
         let input = vrf_input_point(vrf_input_data)?;
@@ -169,7 +169,7 @@ const RESULT_ERR: u8 = 1;
 const PUBLIC_KEY_SIZE: usize = 32;
 
 fn deserialize_public_key(chunk: &[u8]) -> Public {
-    Public::deserialize_compressed(chunk)
+    Public::deserialize_compressed_unchecked(chunk)
         .unwrap_or_else(|_| Public::from(RingProofParams::padding_point()))
 }
 /// Generate ring commitment given concatenation of ring keys.
@@ -324,7 +324,7 @@ pub fn batch_verify_tickets(
     vrf_input_data_len: u32, // the data we prove over
 ) -> Vec<u8> {
     let chunk_size = vrf_input_data_len as usize + SIGNATURE_SIZE;
-    let commitment = RingCommitment::deserialize_compressed(commitment).map_err(|_| ());
+    let commitment = RingCommitment::deserialize_compressed_unchecked(commitment).map_err(|_| ());
     let ring_size = if ring_size as usize == RingSize::Full.size() {
         RingSize::Full
     } else {
