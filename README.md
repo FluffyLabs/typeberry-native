@@ -16,10 +16,6 @@ This repository is dedicated to compiling Rust libraries to WASM to be used in t
 
 **Purpose:** Implements zero-knowledge VRF functionality using Bandersnatch elliptic curve.
 
-## Contributing
-
-We welcome contributions to this project! For detailed information on how to contribute, please refer to the [Typeberry documentation](https://github.com/FluffyLabs/typeberry).
-
 ## License
 
-This project is licensed under the Mozilla Public License 2.0 (MPL-2.0).
+This project is licensed under MIT.
