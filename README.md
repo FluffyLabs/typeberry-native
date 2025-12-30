@@ -1,6 +1,6 @@
 # Typeberry Native
 
-This repository is dedicated to compiling Rust libraries to WASM to be used in typeberry JAM client implementation.
+This repository is dedicated to compiling Rust libraries to WASM to be used in the typeberry JAM client implementation.
 
 ## Sub-packages
 
@@ -10,7 +10,7 @@ This repository is dedicated to compiling Rust libraries to WASM to be used in t
 
 ### 2. Reed-Solomon-wasm
 
-**Purpose:** Provides Reed Solomon error correcting capabilities to guarantee data integrity.
+**Purpose:** Provides Reed Solomon error-correcting capabilities to guarantee data integrity.
 
 ### 3. Bandersnatch
 
