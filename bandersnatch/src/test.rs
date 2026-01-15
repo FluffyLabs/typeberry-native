@@ -255,7 +255,10 @@ mod tests {
             entropy_prefix,
         );
 
-        assert_eq!(result[0], 1, "verify_header_seals should fail on invalid entropy");
+        assert_eq!(
+            result[0], 1,
+            "verify_header_seals should fail on invalid entropy"
+        );
         assert_eq!(result.len(), 65, "result should still be 65 bytes");
         assert_eq!(&result[1..], &[0u8; 64], "output should be zeros on error");
     }

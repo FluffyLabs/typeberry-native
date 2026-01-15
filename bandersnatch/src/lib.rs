@@ -267,8 +267,6 @@ pub fn verify_header_seals(
     result
 }
 
-
-
 /// Seal verification as defined in:
 /// https://graypaper.fluffylabs.dev/#/68eaa1f/0eff000eff00?v=0.6.4
 /// or
