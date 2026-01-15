@@ -215,6 +215,60 @@ pub fn derive_public_key(seed: &[u8]) -> Vec<u8> {
     result
 }
 
+/// Verifies both header seal and entropy source in a single call.
+///
+/// This combines seal verification (block author's VRF proof) with entropy
+/// verification (randomness derivation) as required by the JAM protocol.
+///
+/// # Arguments
+/// * `signer_key` - Signer's public key (32 bytes, compressed)
+/// * `seal_data` - VRF signature for the seal (96 bytes)
+/// * `seal_payload` - VRF input data for seal verification
+/// * `unsealed_header` - Auxiliary data (unsealed header bytes)
+/// * `entropy_data` - VRF signature for entropy (96 bytes)
+/// * `entropy_prefix` - Prefix bytes for entropy payload construction
+///
+/// # Returns
+/// A 65-byte vector:
+/// - Byte 0: Status code (`0` = success, `1` = error)
+/// - Bytes 1-32: Seal VRF output hash (zeros on error)
+/// - Bytes 33-64: Entropy VRF output hash (zeros on error)
+#[wasm_bindgen]
+pub fn verify_header_seals(
+    signer_key: &[u8],
+    seal_data: &[u8],
+    seal_payload: &[u8],
+    unsealed_header: &[u8],
+    entropy_data: &[u8],
+    entropy_prefix: &[u8],
+) -> Vec<u8> {
+    const RESULT_SIZE: usize = 1 + 32 + 32;
+
+    let public_key = deserialize_public_key(signer_key);
+
+    let Ok(seal) = Verifier::ietf_vrf_verify(seal_payload, unsealed_header, seal_data, public_key)
+    else {
+        return vec![RESULT_ERR; 1].into_iter().chain([0u8; 64]).collect();
+    };
+
+    let mut entropy_payload = Vec::with_capacity(entropy_prefix.len() + seal.len());
+    entropy_payload.extend_from_slice(entropy_prefix);
+    entropy_payload.extend_from_slice(&seal);
+
+    let Ok(entropy) = Verifier::ietf_vrf_verify(&entropy_payload, &[], entropy_data, public_key)
+    else {
+        return vec![RESULT_ERR; 1].into_iter().chain([0u8; 64]).collect();
+    };
+
+    let mut result = Vec::with_capacity(RESULT_SIZE);
+    result.push(RESULT_OK);
+    result.extend_from_slice(&seal);
+    result.extend_from_slice(&entropy);
+    result
+}
+
+
+
 /// Seal verification as defined in:
 /// https://graypaper.fluffylabs.dev/#/68eaa1f/0eff000eff00?v=0.6.4
 /// or
