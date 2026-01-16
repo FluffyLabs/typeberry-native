@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use crate::{derive_public_key, generate_seal, ring_commitment, verify_seal, vrf_output_hash};
+    use crate::{
+        derive_public_key, generate_seal, ring_commitment, verify_header_seals, verify_seal,
+        vrf_output_hash,
+    };
 
     #[test]
     fn should_get_ring_commitment() {
@@ -137,5 +140,126 @@ mod tests {
         assert_eq!(verify_result[0], 0);
 
         assert_eq!(entropy, verify_result);
+    }
+
+    #[test]
+    fn should_verify_header_seals() {
+        let seed = hex::decode("007596986419e027e65499cc87027a236bf4a78b5e8bd7f675759d73e7a9c799")
+            .unwrap();
+        let seal_payload = b"seal vrf input";
+        let unsealed_header = b"unsealed header bytes";
+        let entropy_prefix = b"entropy_prefix:";
+
+        let pub_key_result = derive_public_key(&seed);
+        assert_eq!(pub_key_result[0], 0);
+        let pub_key = &pub_key_result[1..];
+
+        let seal_result = generate_seal(&seed, seal_payload, unsealed_header);
+        assert_eq!(seal_result[0], 0);
+        let seal_data = &seal_result[1..];
+
+        let seal_verify = verify_seal(pub_key, seal_data, seal_payload, unsealed_header);
+        assert_eq!(seal_verify[0], 0);
+        let seal_output = &seal_verify[1..];
+
+        let mut entropy_payload = Vec::with_capacity(entropy_prefix.len() + seal_output.len());
+        entropy_payload.extend_from_slice(entropy_prefix);
+        entropy_payload.extend_from_slice(seal_output);
+
+        let entropy_result = generate_seal(&seed, &entropy_payload, &[]);
+        assert_eq!(entropy_result[0], 0);
+        let entropy_data = &entropy_result[1..];
+
+        let result = verify_header_seals(
+            pub_key,
+            seal_data,
+            seal_payload,
+            unsealed_header,
+            entropy_data,
+            entropy_prefix,
+        );
+
+        assert_eq!(result[0], 0, "verify_header_seals should succeed");
+        assert_eq!(result.len(), 65, "result should be 1 + 32 + 32 bytes");
+
+        let returned_seal = &result[1..33];
+        assert_eq!(returned_seal, seal_output);
+
+        let entropy_verify = verify_seal(pub_key, entropy_data, &entropy_payload, &[]);
+        assert_eq!(entropy_verify[0], 0);
+        let expected_entropy = &entropy_verify[1..];
+        let returned_entropy = &result[33..65];
+        assert_eq!(returned_entropy, expected_entropy);
+    }
+
+    #[test]
+    fn should_fail_verify_header_seals_with_invalid_seal() {
+        let seed = hex::decode("007596986419e027e65499cc87027a236bf4a78b5e8bd7f675759d73e7a9c799")
+            .unwrap();
+        let seal_payload = b"seal vrf input";
+        let unsealed_header = b"unsealed header bytes";
+        let entropy_prefix = b"entropy_prefix:";
+
+        let pub_key_result = derive_public_key(&seed);
+        assert_eq!(pub_key_result[0], 0);
+        let pub_key = &pub_key_result[1..];
+
+        let seal_with_wrong_aux = generate_seal(&seed, seal_payload, b"wrong aux data");
+        assert_eq!(seal_with_wrong_aux[0], 0);
+        let seal_data = &seal_with_wrong_aux[1..];
+
+        let entropy_result = generate_seal(&seed, b"dummy", &[]);
+        assert_eq!(entropy_result[0], 0);
+        let entropy_data = &entropy_result[1..];
+
+        let result = verify_header_seals(
+            pub_key,
+            seal_data,
+            seal_payload,
+            unsealed_header,
+            entropy_data,
+            entropy_prefix,
+        );
+
+        assert_eq!(result[0], 1, "verify_header_seals should fail");
+        assert_eq!(result.len(), 65, "result should still be 65 bytes");
+        assert_eq!(&result[1..], &[0u8; 64], "output should be zeros on error");
+    }
+
+    #[test]
+    fn should_fail_verify_header_seals_with_invalid_entropy() {
+        let seed = hex::decode("007596986419e027e65499cc87027a236bf4a78b5e8bd7f675759d73e7a9c799")
+            .unwrap();
+        let seal_payload = b"seal vrf input";
+        let unsealed_header = b"unsealed header bytes";
+        let entropy_prefix = b"entropy_prefix:";
+
+        let pub_key_result = derive_public_key(&seed);
+        assert_eq!(pub_key_result[0], 0);
+        let pub_key = &pub_key_result[1..];
+
+        let seal_result = generate_seal(&seed, seal_payload, unsealed_header);
+        assert_eq!(seal_result[0], 0);
+        let seal_data = &seal_result[1..];
+
+        let entropy_with_wrong_input = generate_seal(&seed, b"completely wrong input", &[]);
+        assert_eq!(entropy_with_wrong_input[0], 0);
+        let entropy_data = &entropy_with_wrong_input[1..];
+
+        let result = verify_header_seals(
+            pub_key,
+            seal_data,
+            seal_payload,
+            unsealed_header,
+            entropy_data,
+            entropy_prefix,
+        );
+
+        assert_eq!(
+            result[0], 1,
+            "verify_header_seals should fail on invalid entropy"
+        );
+        assert_eq!(result.len(), 65, "result should still be 65 bytes");
+        assert_eq!(&result[1..], &[0u8; 64], "output should be zeros on error");
     }
 }
