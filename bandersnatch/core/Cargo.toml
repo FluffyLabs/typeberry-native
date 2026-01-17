@@ -1,0 +1,18 @@
+[package]
+name = "bandersnatch-core"
+version = "0.2.0"
+edition = "2024"
+
+[dependencies]
+ark-vrf = { version = "0.1.1", features = [
+    "bandersnatch",
+    "ring",
+] }
+hex = "0.4.3"
+getrandom = { version = "0.2", features = ["js"] }
+
+[dev-dependencies]
+hex = "0.4.3"
+
+[features]
+default = []

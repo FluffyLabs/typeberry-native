@@ -9,7 +9,80 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - name: Install deps
+        run: npm ci
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+      - name: Build WASM library
+        run: npm run build --workspaces --if-present
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-build
+          path: |
+            bandersnatch/wasm-binding/pkg/
+            ed25519/pkg/
+            reed-solomon/pkg/
+
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            package: darwin-arm64
+            build: |
+              cd bandersnatch/native-binding
+              cargo build --release --target aarch64-apple-darwin
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            package: linux-x64-gnu
+            build: |
+              cd bandersnatch/native-binding
+              cargo build --release --target x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.settings.host }}
+    name: Build native - ${{ matrix.settings.target }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+      - name: Build
+        run: ${{ matrix.settings.build }}
+      - name: Copy binary
+        run: |
+          mkdir -p bandersnatch/npm/${{ matrix.settings.package }}
+          if [ "${{ matrix.settings.host }}" = "macos-latest" ]; then
+            cp bandersnatch/native-binding/target/${{ matrix.settings.target }}/release/libbandersnatch_native.dylib bandersnatch/npm/${{ matrix.settings.package }}/bandersnatch.${{ matrix.settings.package }}.node
+          else
+            cp bandersnatch/native-binding/target/${{ matrix.settings.target }}/release/libbandersnatch_native.so bandersnatch/npm/${{ matrix.settings.package }}/bandersnatch.${{ matrix.settings.package }}.node
+          fi
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: bandersnatch/npm/${{ matrix.settings.package }}/*.node
+          if-no-files-found: error
+
   publish:
+    needs: [build-wasm, build-native]
     runs-on: ubuntu-latest
 
     steps:
@@ -22,25 +95,78 @@ jobs:
           cache: 'npm'
       - name: Install deps
         run: npm ci
-      - name: Install wasm-pack
-        run: cargo install wasm-pack
-      - name: Build WASM library
-        run: npm run build --workspaces
-      - name: Build native library
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-build
+          path: .
+
+      - name: Download darwin-arm64 native
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-aarch64-apple-darwin
+          path: bandersnatch/npm/darwin-arm64/
+
+      - name: Download linux-x64-gnu native
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-x86_64-unknown-linux-gnu
+          path: bandersnatch/npm/linux-x64-gnu/
+
+      - name: Build native library bundle
         run: npm run build
+
       - id: vars
         run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Update version
-        working-directory: ./dist
+      - name: Update versions
         run: |
           node -e "
           const fs = require('fs');
-          const pkg = JSON.parse(fs.readFileSync('package.json'));
-          pkg.version = \`\${pkg.version.split('-')[0]}-${{ steps.vars.outputs.short_sha }}\`;
-          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          const shortSha = '${{ steps.vars.outputs.short_sha }}';
+          
+          // Update dist package version
+          const distPkg = JSON.parse(fs.readFileSync('dist/package.json'));
+          distPkg.version = \`\${distPkg.version.split('-')[0]}-\${shortSha}\`;
+          fs.writeFileSync('dist/package.json', JSON.stringify(distPkg, null, 2));
+          
+          // Update native platform packages
+          const packages = [
+            'bandersnatch/npm/native/package.json',
+            'bandersnatch/npm/darwin-arm64/package.json',
+            'bandersnatch/npm/linux-x64-gnu/package.json'
+          ];
+          
+          for (const pkgPath of packages) {
+            if (fs.existsSync(pkgPath)) {
+              const pkg = JSON.parse(fs.readFileSync(pkgPath));
+              pkg.version = \`\${pkg.version.split('-')[0]}-\${shortSha}\`;
+              fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+            }
+          }
           "
-      - name: Publish package
+
+      - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Publish darwin-arm64 platform package
+          cd bandersnatch/npm/darwin-arm64
+          npm publish --access public || true
+          cd ../../..
+          
+          # Publish linux-x64-gnu platform package
+          cd bandersnatch/npm/linux-x64-gnu
+          npm publish --access public || true
+          cd ../../..
+          
+          # Publish native wrapper package
+          cd bandersnatch/npm/native
+          npm publish --access public || true
+          cd ../../..
+
+      - name: Publish main package
         working-directory: ./dist/
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

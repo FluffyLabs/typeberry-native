@@ -1,0 +1,39 @@
+{
+  "name": "@typeberry/bandersnatch-native",
+  "version": "0.2.0",
+  "description": "Native Node.js bindings for Bandersnatch VRF - auto-selects platform binary",
+  "main": "./index.js",
+  "module": "./index.mjs",
+  "types": "./index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./index.d.ts",
+        "default": "./index.mjs"
+      },
+      "require": {
+        "types": "./index.d.ts",
+        "default": "./index.js"
+      }
+    }
+  },
+  "author": "Fluffy Labs",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FluffyLabs/typeberry-native"
+  },
+  "engines": {
+    "node": ">= 18"
+  },
+  "optionalDependencies": {
+    "@typeberry/bandersnatch-native-darwin-arm64": "0.2.0",
+    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.2.0"
+  },
+  "scripts": {
+    "build": "true",
+    "lint": "true",
+    "test": "true"
+  }
+}
