@@ -61,7 +61,7 @@ jobs:
         with:
           node-version: 22
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.settings.target }}
       - name: Build
@@ -141,7 +141,16 @@ jobs:
           for (const pkgPath of packages) {
             if (fs.existsSync(pkgPath)) {
               const pkg = JSON.parse(fs.readFileSync(pkgPath));
-              pkg.version = \`\${pkg.version.split('-')[0]}-\${shortSha}\`;
+              const baseVersion = pkg.version.split('-')[0];
+              const newVersion = \`\${baseVersion}-\${shortSha}\`;
+              pkg.version = newVersion;
+              if (pkg.optionalDependencies && typeof pkg.optionalDependencies === 'object') {
+                for (const [dep, version] of Object.entries(pkg.optionalDependencies)) {
+                  if (typeof version === 'string' && (version === baseVersion || version.startsWith(baseVersion))) {
+                    pkg.optionalDependencies[dep] = newVersion;
+                  }
+                }
+              }
               fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
             }
           }
@@ -151,20 +160,36 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          # Publish darwin-arm64 platform package
-          cd bandersnatch/npm/darwin-arm64
-          npm publish --access public || true
-          cd ../../..
-          
-          # Publish linux-x64-gnu platform package
-          cd bandersnatch/npm/linux-x64-gnu
-          npm publish --access public || true
-          cd ../../..
-          
-          # Publish native wrapper package
-          cd bandersnatch/npm/native
-          npm publish --access public || true
-          cd ../../..
+          publish_package() {
+            local dir="$1"
+            local label="$2"
+
+            echo "Publishing ${label} from ${dir}..."
+            pushd "$dir" >/dev/null
+
+            publish_output=$(npm publish --access public 2>&1)
+            status=$?
+
+            if [ $status -ne 0 ]; then
+              if echo "$publish_output" | grep -qiE "(previously published versions|already been published|cannot publish over existing version|epublishconflict)"; then
+                echo "Package ${label} already published, skipping."
+                echo "$publish_output"
+              else
+                echo "Failed to publish ${label} (exit code ${status})" >&2
+                echo "$publish_output" >&2
+                popd >/dev/null
+                exit $status
+              fi
+            else
+              echo "$publish_output"
+            fi
+
+            popd >/dev/null
+          }
+
+          publish_package "bandersnatch/npm/darwin-arm64" "darwin-arm64 platform package"
+          publish_package "bandersnatch/npm/linux-x64-gnu" "linux-x64-gnu platform package"
+          publish_package "bandersnatch/npm/native" "native wrapper package"
 
       - name: Publish main package
         working-directory: ./dist/

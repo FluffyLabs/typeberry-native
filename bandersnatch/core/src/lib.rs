@@ -288,6 +288,10 @@ pub fn batch_verify_tickets_impl(
     tickets_data
         .chunks(chunk_size)
         .map(|chunk| {
+            if chunk.len() < chunk_size {
+                return Err(Error::InvalidSignature);
+            }
+
             let signature = &chunk[0..RING_SIGNATURE_SIZE];
             let vrf_input_data = &chunk[RING_SIGNATURE_SIZE..];
 
