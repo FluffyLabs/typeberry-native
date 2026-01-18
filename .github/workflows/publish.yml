@@ -42,14 +42,14 @@ jobs:
             target: aarch64-apple-darwin
             package: darwin-arm64
             build: |
-              cd bandersnatch/native-binding
-              cargo build --release --target aarch64-apple-darwin
+              cd bandersnatch
+              cargo build --release --target aarch64-apple-darwin -p bandersnatch-native
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             package: linux-x64-gnu
             build: |
-              cd bandersnatch/native-binding
-              cargo build --release --target x86_64-unknown-linux-gnu
+              cd bandersnatch
+              cargo build --release --target x86_64-unknown-linux-gnu -p bandersnatch-native
 
     runs-on: ${{ matrix.settings.host }}
     name: Build native - ${{ matrix.settings.target }}
@@ -70,9 +70,9 @@ jobs:
         run: |
           mkdir -p bandersnatch/npm/${{ matrix.settings.package }}
           if [ "${{ matrix.settings.host }}" = "macos-latest" ]; then
-            cp bandersnatch/native-binding/target/${{ matrix.settings.target }}/release/libbandersnatch_native.dylib bandersnatch/npm/${{ matrix.settings.package }}/bandersnatch.${{ matrix.settings.package }}.node
+            cp bandersnatch/target/${{ matrix.settings.target }}/release/libbandersnatch_native.dylib bandersnatch/npm/${{ matrix.settings.package }}/bandersnatch.${{ matrix.settings.package }}.node
           else
-            cp bandersnatch/native-binding/target/${{ matrix.settings.target }}/release/libbandersnatch_native.so bandersnatch/npm/${{ matrix.settings.package }}/bandersnatch.${{ matrix.settings.package }}.node
+            cp bandersnatch/target/${{ matrix.settings.target }}/release/libbandersnatch_native.so bandersnatch/npm/${{ matrix.settings.package }}/bandersnatch.${{ matrix.settings.package }}.node
           fi
       - name: Upload artifact
         uses: actions/upload-artifact@v4

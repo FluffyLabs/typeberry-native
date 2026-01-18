@@ -40,17 +40,17 @@ jobs:
           - host: macos-latest
             target: aarch64-apple-darwin
             build: |
-              cd bandersnatch/native-binding
-              cargo build --release --target aarch64-apple-darwin
-              mkdir -p ../npm/darwin-arm64
-              cp target/aarch64-apple-darwin/release/libbandersnatch_native.dylib ../npm/darwin-arm64/bandersnatch.darwin-arm64.node
+              cd bandersnatch
+              cargo build --release --target aarch64-apple-darwin -p bandersnatch-native
+              mkdir -p npm/darwin-arm64
+              cp target/aarch64-apple-darwin/release/libbandersnatch_native.dylib npm/darwin-arm64/bandersnatch.darwin-arm64.node
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             build: |
-              cd bandersnatch/native-binding
-              cargo build --release --target x86_64-unknown-linux-gnu
-              mkdir -p ../npm/linux-x64-gnu
-              cp target/x86_64-unknown-linux-gnu/release/libbandersnatch_native.so ../npm/linux-x64-gnu/bandersnatch.linux-x64-gnu.node
+              cd bandersnatch
+              cargo build --release --target x86_64-unknown-linux-gnu -p bandersnatch-native
+              mkdir -p npm/linux-x64-gnu
+              cp target/x86_64-unknown-linux-gnu/release/libbandersnatch_native.so npm/linux-x64-gnu/bandersnatch.linux-x64-gnu.node
 
     runs-on: ${{ matrix.settings.host }}
     name: Build native - ${{ matrix.settings.target }}
