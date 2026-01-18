@@ -5,8 +5,6 @@
   "workspaces": [
     "bandersnatch",
     "bandersnatch/npm/native",
-    "bandersnatch/npm/darwin-arm64",
-    "bandersnatch/npm/linux-x64-gnu",
     "ed25519",
     "reed-solomon",
     "native"
