@@ -40,16 +40,8 @@ jobs:
         settings:
           - host: macos-latest
             target: aarch64-apple-darwin
-            package: darwin-arm64
-            build: |
-              cd bandersnatch
-              cargo build --release --target aarch64-apple-darwin -p bandersnatch-native
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            package: linux-x64-gnu
-            build: |
-              cd bandersnatch
-              cargo build --release --target x86_64-unknown-linux-gnu -p bandersnatch-native
 
     runs-on: ${{ matrix.settings.host }}
     name: Build native - ${{ matrix.settings.target }}
@@ -65,15 +57,7 @@ jobs:
         with:
           targets: ${{ matrix.settings.target }}
       - name: Build
-        run: ${{ matrix.settings.build }}
-      - name: Copy binary
-        run: |
-          mkdir -p bandersnatch/npm/${{ matrix.settings.package }}
-          if [ "${{ matrix.settings.host }}" = "macos-latest" ]; then
-            cp bandersnatch/target/${{ matrix.settings.target }}/release/libbandersnatch_native.dylib bandersnatch/npm/${{ matrix.settings.package }}/bandersnatch.${{ matrix.settings.package }}.node
-          else
-            cp bandersnatch/target/${{ matrix.settings.target }}/release/libbandersnatch_native.so bandersnatch/npm/${{ matrix.settings.package }}/bandersnatch.${{ matrix.settings.package }}.node
-          fi
+        run: npm run build:native --workspaces --if-present -- ${{ matrix.settings.target }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

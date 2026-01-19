@@ -42,9 +42,9 @@
   },
   "scripts": {
     "build:wasm": "wasm-pack build wasm-binding --target web --out-dir pkg",
-    "build:native": "cd native-binding && cargo build --release",
+    "build:native": "./build-native.sh",
     "build:ts": "tsc",
-    "build": "npm run build:wasm && npm run build:ts",
+    "build": "npm run build:wasm && npm run build:ts && npm run build:native",
     "lint": "cargo fmt --all --check -q",
     "test": "cargo test --verbose"
   }
