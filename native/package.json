@@ -1,10 +1,31 @@
 {
   "name": "@typeberry/native",
-  "version": "0.0.4",
+  "version": "0.2.0",
+  "description": "Native libraries for typeberry - bundles bandersnatch, ed25519 and reed-solomon with WASM and optional native bindings",
   "main": "./index.js",
+  "types": "./index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./index.d.ts",
+        "default": "./index.js"
+      }
+    }
+  },
   "author": "Fluffy Labs",
   "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FluffyLabs/typeberry-native"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@typeberry/bandersnatch-native-darwin-arm64": "0.2.0",
+    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.2.0"
+  },
   "scripts": {
     "lint": "true",
     "test": "true",

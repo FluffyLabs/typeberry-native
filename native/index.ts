@@ -27,7 +27,7 @@ function initOnce<T>(doInit: () => Promise<T>) {
 }
 
 export const init = {
-  bandersnatch: initOnce(async () => await bandersnatchInit({ module_or_path: bandersnatchWasm })),
-  ed25519: initOnce(async () => await ed25519Init({ module_or_path: ed25519Wasm })),
-  reedSolomon: initOnce(async () => await reedSolomonInit({ module_or_path: reedSolomonWasm })),
+  bandersnatch: initOnce(async () => await bandersnatchInit({ module_or_path: await bandersnatchWasm() })),
+  ed25519: initOnce(async () => await ed25519Init({ module_or_path: await ed25519Wasm() })),
+  reedSolomon: initOnce(async () => await reedSolomonInit({ module_or_path: await reedSolomonWasm() })),
 };
