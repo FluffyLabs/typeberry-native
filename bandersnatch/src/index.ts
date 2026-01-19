@@ -5,6 +5,7 @@ type WasmBindingType = typeof WasmBinding;
 
 let wasmBinding: WasmBindingType | null = null;
 let nativeBinding: typeof NativeBindingType | null = null;
+let nativeBindingError: string | null = null;
 
 function isNode(): boolean {
   return (
@@ -14,13 +15,15 @@ function isNode(): boolean {
 
 async function loadNativeBinding(): Promise<typeof NativeBindingType | null> {
   if (!isNode()) {
+    nativeBindingError = 'Invalid environment';
     return null;
   }
 
   try {
     const native = await import("@typeberry/bandersnatch-native");
     return native.default || native;
-  } catch {
+  } catch (e) {
+    nativeBindingError = `${e}`;
     return null;
   }
 }
@@ -93,12 +96,25 @@ export default async function init(options?: InitOptions): Promise<BandersnatchA
   return createApi();
 }
 
+/**
+ * Check if the binding is initialized already.
+ */
 export function isInitialized(): boolean {
   return wasmBinding !== null || nativeBinding !== null;
 }
 
+/**
+ * Returns true if native binding is used.
+ */
 export function isNativeBinding(): boolean {
   return nativeBinding !== null;
+}
+
+/**
+ * Returns native binding initialisation error (if any).
+ */
+export function getNativeBindingError(): string | null {
+  return nativeBindingError;
 }
 
 function assertInitialized(): void {
