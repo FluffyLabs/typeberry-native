@@ -108,7 +108,7 @@ jobs:
 
       - name: Update versions
         run: |
-          cat <<'EOF' > update_versions.js
+          cat <<'EOF' > update_versions.cjs
           const fs = require('fs');
           const shortSha = '${{ steps.vars.outputs.short_sha }}';
           
@@ -151,7 +151,7 @@ jobs:
           }
           EOF
           
-          node update_versions.js
+          node update_versions.cjs
 
       - name: Publish platform packages
         env:
