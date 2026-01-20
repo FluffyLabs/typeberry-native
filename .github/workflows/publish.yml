@@ -112,12 +112,21 @@ jobs:
           
           // Update dist package version
           const distPkg = JSON.parse(fs.readFileSync('dist/package.json'));
-          distPkg.version = \`\${distPkg.version.split('-')[0]}-\${shortSha}\`;
+          const baseVersion = distPkg.version.split('-')[0];
+          const newVersion = `${baseVersion}-${shortSha}`;
+          distPkg.version = newVersion;
+          
+          if (distPkg.optionalDependencies && typeof distPkg.optionalDependencies === 'object') {
+            for (const [dep, version] of Object.entries(distPkg.optionalDependencies)) {
+              if (typeof version === 'string' && (version === baseVersion || version.startsWith(baseVersion))) {
+                distPkg.optionalDependencies[dep] = newVersion;
+              }
+            }
+          }
           fs.writeFileSync('dist/package.json', JSON.stringify(distPkg, null, 2));
           
           // Update native platform packages
           const packages = [
-            'bandersnatch/npm/native/package.json',
             'bandersnatch/npm/darwin-arm64/package.json',
             'bandersnatch/npm/linux-x64-gnu/package.json'
           ];
@@ -125,13 +134,13 @@ jobs:
           for (const pkgPath of packages) {
             if (fs.existsSync(pkgPath)) {
               const pkg = JSON.parse(fs.readFileSync(pkgPath));
-              const baseVersion = pkg.version.split('-')[0];
-              const newVersion = \`\${baseVersion}-\${shortSha}\`;
-              pkg.version = newVersion;
+              // reuse baseVersion from distPkg assuming they are synced
+              const pkgNewVersion = `${pkg.version.split('-')[0]}-${shortSha}`;
+              pkg.version = pkgNewVersion;
               if (pkg.optionalDependencies && typeof pkg.optionalDependencies === 'object') {
                 for (const [dep, version] of Object.entries(pkg.optionalDependencies)) {
                   if (typeof version === 'string' && (version === baseVersion || version.startsWith(baseVersion))) {
-                    pkg.optionalDependencies[dep] = newVersion;
+                    pkg.optionalDependencies[dep] = pkgNewVersion;
                   }
                 }
               }
@@ -173,7 +182,6 @@ jobs:
 
           publish_package "bandersnatch/npm/darwin-arm64" "darwin-arm64 platform package"
           publish_package "bandersnatch/npm/linux-x64-gnu" "linux-x64-gnu platform package"
-          publish_package "bandersnatch/npm/native" "native wrapper package"
 
       - name: Publish main package
         working-directory: ./dist/
