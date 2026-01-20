@@ -29,8 +29,10 @@ jobs:
         run: npm run lint --workspaces --if-present
       - name: Run tests
         run: npm run test --workspaces --if-present
-      - name: Build WASM library
+      - name: Build workspaces
         run: npm run build --workspaces --if-present
+      - name: Build final bundle
+        run: npm run build
 
   build-native:
     strategy:
