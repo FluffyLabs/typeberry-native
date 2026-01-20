@@ -1,10 +1,10 @@
 import type * as WasmBinding from "../wasm-binding/pkg/bandersnatch_wasm";
-import type NativeBindingType from "@typeberry/bandersnatch-native";
+import type { NativeBinding } from "./native.js";
 
 type WasmBindingType = typeof WasmBinding;
 
 let wasmBinding: WasmBindingType | null = null;
-let nativeBinding: typeof NativeBindingType | null = null;
+let nativeBinding: NativeBinding | null = null;
 let nativeBindingError: string | null = null;
 
 function isNode(): boolean {
@@ -13,14 +13,14 @@ function isNode(): boolean {
   );
 }
 
-async function loadNativeBinding(): Promise<typeof NativeBindingType | null> {
+async function loadNativeBinding(): Promise<NativeBinding | null> {
   if (!isNode()) {
     nativeBindingError = 'Invalid environment';
     return null;
   }
 
   try {
-    const native = await import("@typeberry/bandersnatch-native");
+    const native = await import("./native.js");
     return native.default || native;
   } catch (e) {
     nativeBindingError = `${e}`;

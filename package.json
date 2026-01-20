@@ -4,7 +4,6 @@
   "description": "Native libraries for typeberry.",
   "workspaces": [
     "bandersnatch",
-    "bandersnatch/npm/native",
     "ed25519",
     "reed-solomon",
     "native"
@@ -19,6 +18,10 @@
   "type": "module",
   "author": "Fluffy Labs",
   "license": "MPL-2.0",
+  "optionalDependencies": {
+    "@typeberry/bandersnatch-native-darwin-arm64": "0.2.0",
+    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.2.0"
+  },
   "devDependencies": {
     "@napi-rs/cli": "^3.1.5",
     "@rollup/plugin-wasm": "^6.2.2",

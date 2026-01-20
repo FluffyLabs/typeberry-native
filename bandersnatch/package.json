@@ -20,8 +20,8 @@
     },
     "./native": {
       "import": {
-        "types": "./npm/native/index.d.ts",
-        "default": "./npm/native/index.mjs"
+        "types": "./dist/native.d.ts",
+        "default": "./dist/native.js"
       }
     }
   },
@@ -35,7 +35,8 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "@typeberry/bandersnatch-native": "0.2.0"
+    "@typeberry/bandersnatch-native-darwin-arm64": "0.2.0",
+    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.2.0"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

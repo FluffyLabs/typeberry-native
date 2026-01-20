@@ -17,7 +17,6 @@
     "verbatimModuleSyntax": false,
     "baseUrl": ".",
     "paths": {
-      "@typeberry/bandersnatch-native": ["./npm/native/index.d.ts"]
     }
   },
   "include": ["src/**/*"],
