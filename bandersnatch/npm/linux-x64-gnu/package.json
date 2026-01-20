@@ -1,0 +1,26 @@
+{
+  "name": "@typeberry/bandersnatch-native-linux-x64-gnu",
+  "version": "0.2.0",
+  "description": "Native Node.js bindings for Bandersnatch VRF - linux-x64-gnu platform",
+  "main": "./bandersnatch.linux-x64-gnu.node",
+  "os": ["linux"],
+  "cpu": ["x64"],
+  "libc": ["glibc"],
+  "author": "Fluffy Labs",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FluffyLabs/typeberry-native"
+  },
+  "engines": {
+    "node": ">= 18"
+  },
+  "files": [
+    "bandersnatch.linux-x64-gnu.node"
+  ],
+  "scripts": {
+    "build": "true",
+    "lint": "true",
+    "test": "true"
+  }
+}

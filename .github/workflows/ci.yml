@@ -26,9 +26,42 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Check formatting
-        run: npm run lint --workspaces
+        run: npm run lint --workspaces --if-present
       - name: Run tests
-        run: npm run test --workspaces
-      - name: Build WASM library
-        run: npm run build --workspaces
+        run: npm run test --workspaces --if-present
+      - name: Build workspaces
+        run: npm run build --workspaces --if-present
+      - name: Build final bundle
+        run: npm run build
 
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-latest
+            target: aarch64-apple-darwin
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.settings.host }}
+    name: Build native - ${{ matrix.settings.target }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+      - name: Build
+        run: npm run build:native --workspaces --if-present -- ${{ matrix.settings.target }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: bandersnatch/npm/*/*.node
+          if-no-files-found: error

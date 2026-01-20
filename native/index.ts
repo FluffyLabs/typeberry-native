@@ -3,7 +3,7 @@ export * as ed25519 from "@typeberry/ed25519";
 export * as reedSolomon from "@typeberry/reed-solomon";
 
 import bandersnatchInit from "@typeberry/bandersnatch";
-import bandersnatchWasm from "../bandersnatch/pkg/bandersnatch_bg.wasm";
+import bandersnatchWasm from "../bandersnatch/wasm-binding/pkg/bandersnatch_wasm_bg.wasm";
 import ed25519Init from "@typeberry/ed25519";
 import ed25519Wasm from "../ed25519/pkg/ed25519_wasm_bg.wasm";
 import reedSolomonInit from "@typeberry/reed-solomon";
@@ -16,8 +16,8 @@ export async function initAll() {
   await init.reedSolomon();
 }
 
-function initOnce<T>(doInit: (): Promise<T>) {
-  let ready = null;
+function initOnce<T>(doInit: () => Promise<T>) {
+  let ready: Promise<T> | null = null;
   return async () => {
     if (ready === null) {
       ready = doInit();
@@ -27,7 +27,7 @@ function initOnce<T>(doInit: (): Promise<T>) {
 }
 
 export const init = {
-  bandersnatch: initOnce(async () => await bandersnatchInit({ module_or_path: await bandersnatchWasm()})),
-  ed25519: initOnce(async () => await ed25519Init({ module_or_path: await ed25519Wasm()})),
-  reedSolomon: initOnce(async () => await reedSolomonInit({ module_or_path: await reedSolomonWasm()})),
+  bandersnatch: initOnce(async () => await bandersnatchInit({ module_or_path: await bandersnatchWasm() })),
+  ed25519: initOnce(async () => await ed25519Init({ module_or_path: await ed25519Wasm() })),
+  reedSolomon: initOnce(async () => await reedSolomonInit({ module_or_path: await reedSolomonWasm() })),
 };

@@ -1,12 +1,51 @@
 {
   "name": "@typeberry/bandersnatch",
-  "version": "0.0.1",
-  "main": "./pkg/bandersnatch.js",
+  "version": "0.2.0",
+  "description": "Bandersnatch VRF library - auto-detects native bindings for Node.js with WASM fallback for browsers",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./wasm": {
+      "import": {
+        "types": "./wasm-binding/pkg/bandersnatch_wasm.d.ts",
+        "default": "./wasm-binding/pkg/bandersnatch_wasm.js"
+      }
+    },
+    "./native": {
+      "import": {
+        "types": "./dist/native.d.ts",
+        "default": "./dist/native.js"
+      }
+    }
+  },
   "author": "Fluffy Labs",
   "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FluffyLabs/typeberry-native"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@typeberry/bandersnatch-native-darwin-arm64": "0.2.0",
+    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
   "scripts": {
-    "build": "wasm-pack build --target web",
+    "build:wasm": "wasm-pack build wasm-binding --target web --out-dir pkg",
+    "build:native": "./build-native.sh",
+    "build:ts": "tsc",
+    "build": "npm run build:wasm && npm run build:ts && npm run build:native",
     "lint": "cargo fmt --all --check -q",
     "test": "cargo test --verbose"
   }

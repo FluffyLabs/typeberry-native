@@ -9,7 +9,66 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - name: Install deps
+        run: npm ci
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+      - name: Build WASM library
+        run: npm run build --workspaces --if-present
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-build
+          path: |
+            bandersnatch/wasm-binding/pkg/
+            ed25519/pkg/
+            reed-solomon/pkg/
+
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            package: darwin-arm64
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            package: linux-x64-gnu
+
+    runs-on: ${{ matrix.settings.host }}
+    name: Build native - ${{ matrix.settings.target }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+      - name: Build
+        run: npm run build:native --workspaces --if-present -- ${{ matrix.settings.target }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: bandersnatch/npm/${{ matrix.settings.package }}/*.node
+          if-no-files-found: error
+
   publish:
+    needs: [build-wasm, build-native]
     runs-on: ubuntu-latest
 
     steps:
@@ -22,25 +81,111 @@ jobs:
           cache: 'npm'
       - name: Install deps
         run: npm ci
-      - name: Install wasm-pack
-        run: cargo install wasm-pack
-      - name: Build WASM library
-        run: npm run build --workspaces
-      - name: Build native library
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-build
+          path: .
+
+      - name: Download darwin-arm64 native
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-aarch64-apple-darwin
+          path: bandersnatch/npm/darwin-arm64/
+
+      - name: Download linux-x64-gnu native
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-x86_64-unknown-linux-gnu
+          path: bandersnatch/npm/linux-x64-gnu/
+
+      - name: Build native library bundle
         run: npm run build
+
       - id: vars
         run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Update version
-        working-directory: ./dist
+      - name: Update versions
         run: |
           node -e "
           const fs = require('fs');
-          const pkg = JSON.parse(fs.readFileSync('package.json'));
-          pkg.version = \`\${pkg.version.split('-')[0]}-${{ steps.vars.outputs.short_sha }}\`;
-          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          const shortSha = '${{ steps.vars.outputs.short_sha }}';
+          
+          // Update dist package version
+          const distPkg = JSON.parse(fs.readFileSync('dist/package.json'));
+          const baseVersion = distPkg.version.split('-')[0];
+          const newVersion = `${baseVersion}-${shortSha}`;
+          distPkg.version = newVersion;
+          
+          if (distPkg.optionalDependencies && typeof distPkg.optionalDependencies === 'object') {
+            for (const [dep, version] of Object.entries(distPkg.optionalDependencies)) {
+              if (typeof version === 'string' && (version === baseVersion || version.startsWith(baseVersion))) {
+                distPkg.optionalDependencies[dep] = newVersion;
+              }
+            }
+          }
+          fs.writeFileSync('dist/package.json', JSON.stringify(distPkg, null, 2));
+          
+          // Update native platform packages
+          const packages = [
+            'bandersnatch/npm/darwin-arm64/package.json',
+            'bandersnatch/npm/linux-x64-gnu/package.json'
+          ];
+          
+          for (const pkgPath of packages) {
+            if (fs.existsSync(pkgPath)) {
+              const pkg = JSON.parse(fs.readFileSync(pkgPath));
+              // reuse baseVersion from distPkg assuming they are synced
+              const pkgNewVersion = `${pkg.version.split('-')[0]}-${shortSha}`;
+              pkg.version = pkgNewVersion;
+              if (pkg.optionalDependencies && typeof pkg.optionalDependencies === 'object') {
+                for (const [dep, version] of Object.entries(pkg.optionalDependencies)) {
+                  if (typeof version === 'string' && (version === baseVersion || version.startsWith(baseVersion))) {
+                    pkg.optionalDependencies[dep] = pkgNewVersion;
+                  }
+                }
+              }
+              fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+            }
+          }
           "
-      - name: Publish package
+
+      - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          publish_package() {
+            local dir="$1"
+            local label="$2"
+
+            echo "Publishing ${label} from ${dir}..."
+            pushd "$dir" >/dev/null
+
+            publish_output=$(npm publish --access public 2>&1)
+            status=$?
+
+            if [ $status -ne 0 ]; then
+              if echo "$publish_output" | grep -qiE "(previously published versions|already been published|cannot publish over existing version|epublishconflict)"; then
+                echo "Package ${label} already published, skipping."
+                echo "$publish_output"
+              else
+                echo "Failed to publish ${label} (exit code ${status})" >&2
+                echo "$publish_output" >&2
+                popd >/dev/null
+                exit $status
+              fi
+            else
+              echo "$publish_output"
+            fi
+
+            popd >/dev/null
+          }
+
+          publish_package "bandersnatch/npm/darwin-arm64" "darwin-arm64 platform package"
+          publish_package "bandersnatch/npm/linux-x64-gnu" "linux-x64-gnu platform package"
+
+      - name: Publish main package
         working-directory: ./dist/
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
