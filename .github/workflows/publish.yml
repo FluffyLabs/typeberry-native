@@ -70,6 +70,8 @@ jobs:
   publish:
     needs: [build-wasm, build-native]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -154,8 +156,6 @@ jobs:
           node update_versions.cjs
 
       - name: Publish platform packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           publish_package() {
             local dir="$1"
@@ -189,6 +189,4 @@ jobs:
 
       - name: Publish main package
         working-directory: ./dist/
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
