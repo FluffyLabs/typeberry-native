@@ -59,6 +59,26 @@ pub fn vrf_output_hash(secret_seed: Buffer, input: Buffer) -> Buffer {
 }
 
 #[napi]
+pub fn batch_generate_ring_vrf(
+    ring_size: u32,
+    secret_seed: Buffer,
+    inputs_data: Buffer,
+    vrf_input_data_len: u32,
+    ring_keys: Buffer,
+    prover_key_index: u32,
+) -> Buffer {
+    ffi::batch_generate_ring_vrf(
+        ring_size,
+        secret_seed.as_ref(),
+        inputs_data.as_ref(),
+        vrf_input_data_len,
+        ring_keys.as_ref(),
+        prover_key_index,
+    )
+    .into()
+}
+
+#[napi]
 pub fn batch_verify_tickets(
     ring_size: u32,
     commitment: Buffer,
