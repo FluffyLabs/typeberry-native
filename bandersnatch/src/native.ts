@@ -21,6 +21,13 @@ export interface NativeBinding {
   ) => Uint8Array;
   generateSeal: (secretSeed: Uint8Array, input: Uint8Array, auxData: Uint8Array) => Uint8Array;
   vrfOutputHash: (secretSeed: Uint8Array, input: Uint8Array) => Uint8Array;
+  batchGenerateRingVrf: (
+    ringKeys: Uint8Array,
+    proverKeyIndex: number,
+    secretSeed: Uint8Array,
+    inputsData: Uint8Array,
+    vrfInputDataLen: number
+  ) => Uint8Array;
   batchVerifyTickets: (
     ringSize: number,
     commitment: Uint8Array,
@@ -74,6 +81,7 @@ export const verifyHeaderSeals = binding.verifyHeaderSeals;
 export const verifySeal = binding.verifySeal;
 export const generateSeal = binding.generateSeal;
 export const vrfOutputHash = binding.vrfOutputHash;
+export const batchGenerateRingVrf = binding.batchGenerateRingVrf;
 export const batchVerifyTickets = binding.batchVerifyTickets;
 
 export default binding;

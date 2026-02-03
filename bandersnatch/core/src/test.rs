@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod tests {
     use crate::{
-        RingSize, compute_ring_commitment, compute_vrf_output_hash, derive_public_key_from_seed,
-        deserialize_public_key, generate_ietf_seal, verify_header_seals_impl, verify_seal_impl,
+        RingSize, batch_generate_ring_vrf_impl, compute_ring_commitment, compute_vrf_output_hash,
+        derive_public_key_from_seed, deserialize_public_key, generate_ietf_seal,
+        verify_header_seals_impl, verify_seal_impl,
     };
 
     #[test]
@@ -201,5 +202,68 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    /// Helper: create a ring of `size` keys, returning (seeds, public_keys).
+    fn make_ring(size: usize) -> (Vec<Vec<u8>>, Vec<crate::bandersnatch::Public>) {
+        let seeds: Vec<Vec<u8>> = (0..size).map(|i| i.to_le_bytes().to_vec()).collect();
+        let public_keys: Vec<_> = seeds
+            .iter()
+            .map(|s| {
+                let pk_bytes = derive_public_key_from_seed(s).unwrap();
+                deserialize_public_key(&pk_bytes)
+            })
+            .collect();
+        (seeds, public_keys)
+    }
+
+    #[test]
+    fn should_batch_generate_and_batch_verify() {
+        let (seeds, public_keys) = make_ring(RingSize::Tiny.size());
+        let prover_index = 1;
+        let input_len = 36;
+        let num_inputs = 3u32;
+
+        // Build concatenated inputs
+        let mut inputs_data = Vec::new();
+        for attempt in 0..num_inputs {
+            inputs_data.extend_from_slice(&[0xCD; 32]);
+            inputs_data.extend_from_slice(&attempt.to_le_bytes());
+        }
+
+        let results = batch_generate_ring_vrf_impl(
+            &public_keys,
+            prover_index,
+            &seeds[prover_index],
+            &inputs_data,
+            input_len,
+        );
+
+        assert_eq!(results.len(), num_inputs as usize);
+
+        let commitment_bytes = compute_ring_commitment(&public_keys, RingSize::Tiny).unwrap();
+
+        // Build verify input: signature || vrf_input per item
+        let mut verify_data = Vec::new();
+        for (i, result) in results.iter().enumerate() {
+            let signature = result.as_ref().unwrap();
+            verify_data.extend_from_slice(signature);
+            verify_data.extend_from_slice(&inputs_data[i * input_len..(i + 1) * input_len]);
+        }
+
+        let verify_results = crate::batch_verify_tickets_impl(
+            RingSize::Tiny,
+            &commitment_bytes,
+            &verify_data,
+            input_len,
+        );
+
+        assert_eq!(verify_results.len(), num_inputs as usize);
+        for (i, verify_result) in verify_results.iter().enumerate() {
+            let verified_hash = verify_result.as_ref().expect("verification should succeed");
+            let vrf_input = &inputs_data[i * input_len..(i + 1) * input_len];
+            let expected = compute_vrf_output_hash(&seeds[prover_index], vrf_input).unwrap();
+            assert_eq!(*verified_hash, expected);
+        }
     }
 }
