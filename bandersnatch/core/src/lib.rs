@@ -207,41 +207,6 @@ pub fn derive_public_key_from_seed(seed: &[u8]) -> Result<Vec<u8>, Error> {
     Ok(buf)
 }
 
-pub(crate) fn batch_generate_ring_vrf_impl(
-    ring_size: RingSize,
-    secret_seed: &[u8],
-    inputs_data: &[u8],
-    vrf_input_data_len: usize,
-    ring_keys: &[Public],
-    prover_key_index: usize,
-) -> Vec<Result<Vec<u8>, Error>> {
-    let secret = Secret::from_seed(secret_seed);
-    let ring_params = ring_proof_params(ring_size);
-    let pts: Vec<_> = ring_keys.iter().map(|pk| pk.0).collect();
-
-    inputs_data
-        .chunks(vrf_input_data_len)
-        .map(|vrf_input_data| {
-            if vrf_input_data.len() < vrf_input_data_len {
-                return Err(Error::InvalidPointData);
-            }
-
-            let input = vrf_input_point(vrf_input_data)?;
-            let output = secret.output(input);
-
-            let prover_key = ring_params.prover_key(&pts);
-            let prover = ring_params.prover(prover_key, prover_key_index);
-            let proof = ark_vrf::ring::Prover::prove(&secret, input, output, &[], &prover);
-
-            let sig = RingVrfSignature { output, proof };
-            let mut signature = Vec::new();
-            sig.serialize_compressed(&mut signature)
-                .map_err(|_| Error::InvalidSignature)?;
-            Ok(signature)
-        })
-        .collect()
-}
-
 /// Generate an IETF VRF seal (signature).
 pub fn generate_ietf_seal(
     secret_seed: &[u8],
@@ -300,6 +265,42 @@ pub fn verify_seal_impl(
 ) -> Result<[u8; 32], Error> {
     let public_key = deserialize_public_key(signer_key);
     Verifier::ietf_vrf_verify(payload, aux_data, seal_data, public_key)
+}
+
+/// Batch generate anonymous ring VRF signatures.
+pub fn batch_generate_ring_vrf_impl(
+    ring_keys: &[Public],
+    prover_key_index: usize,
+    secret_seed: &[u8],
+    inputs_data: &[u8],
+    vrf_input_data_len: usize,
+) -> Vec<Result<Vec<u8>, Error>> {
+    let ring_size = RingSize::from_size(ring_keys.len());
+    let secret = Secret::from_seed(secret_seed);
+    let ring_params = ring_proof_params(ring_size);
+    let pts: Vec<_> = ring_keys.iter().map(|pk| pk.0).collect();
+
+    inputs_data
+        .chunks(vrf_input_data_len)
+        .map(|vrf_input_data| {
+            if vrf_input_data.len() < vrf_input_data_len {
+                return Err(Error::InvalidPointData);
+            }
+
+            let input = vrf_input_point(vrf_input_data)?;
+            let output = secret.output(input);
+
+            let prover_key = ring_params.prover_key(&pts);
+            let prover = ring_params.prover(prover_key, prover_key_index);
+            let proof = ark_vrf::ring::Prover::prove(&secret, input, output, &[], &prover);
+
+            let sig = RingVrfSignature { output, proof };
+            let mut signature = Vec::new();
+            sig.serialize_compressed(&mut signature)
+                .map_err(|_| Error::InvalidSignature)?;
+            Ok(signature)
+        })
+        .collect()
 }
 
 /// Batch verify multiple tickets.
@@ -456,31 +457,24 @@ pub mod ffi {
         }
     }
 
-    /// Batch generate anonymous ring VRF signatures.
     pub fn batch_generate_ring_vrf(
-        ring_size: u32,
-        secret_seed: &[u8],
-        /// Concatenated vrf input data - each and every item has `vrf_input_data_len` bytes and this is the data to be batch-proven.
-        vrf_input_data_concat: &[u8],
-        // byte length of single chunk in `vrf_input_data`
-        vrf_input_data_len: u32,
         ring_keys: &[u8],
         prover_key_index: u32,
+        secret_seed: &[u8],
+        inputs_data: &[u8],
+        vrf_input_data_len: u32,
     ) -> Vec<u8> {
-        let ring_size = RingSize::from_size(ring_size as usize);
-
         let public_keys: Vec<_> = ring_keys
             .chunks(PUBLIC_KEY_SIZE)
             .map(deserialize_public_key)
             .collect();
 
         let results = batch_generate_ring_vrf_impl(
-            ring_size,
+            &public_keys,
+            prover_key_index as usize,
             secret_seed,
             inputs_data,
             vrf_input_data_len as usize,
-            &public_keys,
-            prover_key_index as usize,
         );
 
         results.into_iter().fold(Vec::new(), |mut acc, result| {

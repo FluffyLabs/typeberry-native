@@ -57,12 +57,11 @@ export type BandersnatchApi = {
   generateSeal: (secretSeed: Uint8Array, input: Uint8Array, auxData: Uint8Array) => Uint8Array;
   vrfOutputHash: (secretSeed: Uint8Array, input: Uint8Array) => Uint8Array;
   batchGenerateRingVrf: (
-    ringSize: number,
+    ringKeys: Uint8Array,
+    proverKeyIndex: number,
     secretSeed: Uint8Array,
     inputsData: Uint8Array,
-    vrfInputDataLen: number,
-    ringKeys: Uint8Array,
-    proverKeyIndex: number
+    vrfInputDataLen: number
   ) => Uint8Array;
   batchVerifyTickets: (
     ringSize: number,
@@ -211,31 +210,28 @@ export function vrfOutputHash(secretSeed: Uint8Array, input: Uint8Array): Uint8A
 }
 
 export function batchGenerateRingVrf(
-  ringSize: number,
+  ringKeys: Uint8Array,
+  proverKeyIndex: number,
   secretSeed: Uint8Array,
   inputsData: Uint8Array,
-  vrfInputDataLen: number,
-  ringKeys: Uint8Array,
-  proverKeyIndex: number
+  vrfInputDataLen: number
 ): Uint8Array {
   assertInitialized();
   if (nativeBinding) {
     return nativeBinding.batchGenerateRingVrf(
-      ringSize,
+      ringKeys,
+      proverKeyIndex,
       secretSeed,
       inputsData,
-      vrfInputDataLen,
-      ringKeys,
-      proverKeyIndex
+      vrfInputDataLen
     );
   }
   return wasmBinding!.batch_generate_ring_vrf(
-    ringSize,
+    ringKeys,
+    proverKeyIndex,
     secretSeed,
     inputsData,
-    vrfInputDataLen,
-    ringKeys,
-    proverKeyIndex
+    vrfInputDataLen
   );
 }
 

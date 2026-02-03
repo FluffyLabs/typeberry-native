@@ -232,12 +232,11 @@ mod tests {
         }
 
         let results = batch_generate_ring_vrf_impl(
-            RingSize::Tiny,
+            &public_keys,
+            prover_index,
             &seeds[prover_index],
             &inputs_data,
             input_len,
-            &public_keys,
-            prover_index,
         );
 
         assert_eq!(results.len(), num_inputs as usize);

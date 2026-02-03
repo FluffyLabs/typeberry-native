@@ -22,12 +22,11 @@ export interface NativeBinding {
   generateSeal: (secretSeed: Uint8Array, input: Uint8Array, auxData: Uint8Array) => Uint8Array;
   vrfOutputHash: (secretSeed: Uint8Array, input: Uint8Array) => Uint8Array;
   batchGenerateRingVrf: (
-    ringSize: number,
+    ringKeys: Uint8Array,
+    proverKeyIndex: number,
     secretSeed: Uint8Array,
     inputsData: Uint8Array,
-    vrfInputDataLen: number,
-    ringKeys: Uint8Array,
-    proverKeyIndex: number
+    vrfInputDataLen: number
   ) => Uint8Array;
   batchVerifyTickets: (
     ringSize: number,
