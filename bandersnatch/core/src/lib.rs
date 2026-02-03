@@ -207,8 +207,7 @@ pub fn derive_public_key_from_seed(seed: &[u8]) -> Result<Vec<u8>, Error> {
     Ok(buf)
 }
 
-/// Batch generate anonymous ring VRF signatures.
-pub fn batch_generate_ring_vrf_impl(
+pub(crate) fn batch_generate_ring_vrf_impl(
     ring_size: RingSize,
     secret_seed: &[u8],
     inputs_data: &[u8],
@@ -457,10 +456,13 @@ pub mod ffi {
         }
     }
 
+    /// Batch generate anonymous ring VRF signatures.
     pub fn batch_generate_ring_vrf(
         ring_size: u32,
         secret_seed: &[u8],
-        inputs_data: &[u8],
+        /// Concatenated vrf input data - each and every item has `vrf_input_data_len` bytes and this is the data to be batch-proven.
+        vrf_input_data_concat: &[u8],
+        // byte length of single chunk in `vrf_input_data`
         vrf_input_data_len: u32,
         ring_keys: &[u8],
         prover_key_index: u32,
