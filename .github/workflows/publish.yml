@@ -173,7 +173,7 @@ jobs:
             echo "Publishing ${label} from ${dir}..."
             pushd "$dir" >/dev/null
 
-            npm publish --access public --tag latest
+            npm publish --access public --tag latest --dry-run
             status=$?
 
             if [ $status -ne 0 ]; then
@@ -190,4 +190,4 @@ jobs:
 
       - name: Publish main package
         working-directory: ./dist/
-        run: npm publish --access public --tag latest
+        run: npm publish --access public --tag latest --dry-run
