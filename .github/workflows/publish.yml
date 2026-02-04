@@ -3,7 +3,7 @@ name: Publish
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "ms-publish-logs" ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -79,7 +79,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          registry-url: "https://registry.npmjs.org"
           cache: 'npm'
       - name: Install deps
         run: npm ci
@@ -155,6 +154,16 @@ jobs:
           
           node update_versions.cjs
 
+      - name: Debug environment
+        run: |
+          echo "npm version: $(npm --version)"
+          echo "node version: $(node --version)"
+          echo "NPM_CONFIG_USERCONFIG: ${NPM_CONFIG_USERCONFIG:-not set}"
+          echo "NODE_AUTH_TOKEN set: ${NODE_AUTH_TOKEN:+yes}"
+          cat "${NPM_CONFIG_USERCONFIG:-/dev/null}" 2>/dev/null || echo "no npmrc found"
+          ls -la bandersnatch/npm/darwin-arm64/
+          cat bandersnatch/npm/darwin-arm64/package.json
+
       - name: Publish platform packages
         run: |
           publish_package() {
@@ -164,21 +173,13 @@ jobs:
             echo "Publishing ${label} from ${dir}..."
             pushd "$dir" >/dev/null
 
-            publish_output=$(npm publish --access public 2>&1)
+            npm publish --access public
             status=$?
 
             if [ $status -ne 0 ]; then
-              if echo "$publish_output" | grep -qiE "(previously published versions|already been published|cannot publish over existing version|epublishconflict)"; then
-                echo "Package ${label} already published, skipping."
-                echo "$publish_output"
-              else
-                echo "Failed to publish ${label} (exit code ${status})" >&2
-                echo "$publish_output" >&2
-                popd >/dev/null
-                exit $status
-              fi
-            else
-              echo "$publish_output"
+              echo "Failed to publish ${label} (exit code ${status})" >&2
+              popd >/dev/null
+              return $status
             fi
 
             popd >/dev/null
