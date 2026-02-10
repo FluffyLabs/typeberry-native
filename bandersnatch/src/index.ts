@@ -21,7 +21,7 @@ async function loadNativeBinding(): Promise<NativeBinding | null> {
 
   try {
     const native = await import("./native.js");
-    return native.default || native;
+    return native.loadNativeBinding();
   } catch (e) {
     nativeBindingError = `${e}`;
     return null;

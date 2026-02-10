@@ -1,6 +1,3 @@
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
 
 export interface NativeBinding {
   ringCommitment: (keys: Uint8Array) => Uint8Array;
@@ -36,7 +33,10 @@ export interface NativeBinding {
   ) => Uint8Array;
 }
 
-function loadNativeBinding(): NativeBinding {
+export async function loadNativeBinding(): Promise<NativeBinding> {
+  const { createRequire } = await import('module');
+  const require = createRequire(import.meta.url);
+
   // process is defined in env.d.ts but might be undefined in some envs. 
   // However this file is meant for Node.js usage.
   const platform = process?.platform;
@@ -73,15 +73,3 @@ function loadNativeBinding(): NativeBinding {
   return nativeBinding;
 }
 
-const binding = loadNativeBinding();
-
-export const ringCommitment = binding.ringCommitment;
-export const derivePublicKey = binding.derivePublicKey;
-export const verifyHeaderSeals = binding.verifyHeaderSeals;
-export const verifySeal = binding.verifySeal;
-export const generateSeal = binding.generateSeal;
-export const vrfOutputHash = binding.vrfOutputHash;
-export const batchGenerateRingVrf = binding.batchGenerateRingVrf;
-export const batchVerifyTickets = binding.batchVerifyTickets;
-
-export default binding;
