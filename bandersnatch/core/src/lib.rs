@@ -7,7 +7,8 @@ use ark_vrf::ietf::Prover;
 use ark_vrf::reexports::ark_serialize::{self, CanonicalDeserialize, CanonicalSerialize};
 use ark_vrf::suites::bandersnatch;
 use bandersnatch::{
-    BandersnatchSha512Ell2, IetfProof, Input, Output, Public, RingProof, RingProofParams, Secret,
+    BandersnatchSha512Ell2, IetfProof, Input, Output, Public, RingProof, RingProofParams,
+    RingVerifier, Secret,
 };
 
 #[cfg(test)]
@@ -76,6 +77,18 @@ pub fn ring_proof_params(ring_size: RingSize) -> &'static RingProofParams {
     }
 }
 
+/// Build a ring verifier from a commitment for the given ring size.
+///
+/// The verifier key is reconstructed from the commitment and the constant
+/// verifier key component of the SRS. Constructing the verifier clones the full
+/// `PiopParams` (sized to the ring's domain), so callers verifying many
+/// signatures against the same ring should build it once and reuse it.
+fn build_ring_verifier(ring_size: RingSize, commitment: RingCommitment) -> RingVerifier {
+    let ring_params = ring_proof_params(ring_size);
+    let verifier_key = ring_params.verifier_key_from_commitment(commitment);
+    ring_params.verifier(verifier_key)
+}
+
 /// Construct VRF Input Point from arbitrary data (section 1.2).
 pub fn vrf_input_point(vrf_input_data: &[u8]) -> Result<Input, Error> {
     Input::new(vrf_input_data).ok_or(Error::InvalidPointData)
@@ -133,6 +146,22 @@ impl Verifier {
         aux_data: &[u8],
         signature: &[u8],
     ) -> Result<[u8; 32], Error> {
+        let verifier = build_ring_verifier(ring_size, commitment);
+        Self::ring_vrf_verify_with(&verifier, vrf_input_data, aux_data, signature)
+    }
+
+    /// Verify a single ring VRF signature against a pre-built verifier.
+    ///
+    /// Building the verifier clones the full `PiopParams` (sized to the ring's
+    /// domain), so when verifying many signatures against the same ring the
+    /// verifier should be built once via [`build_ring_verifier`] and reused
+    /// here, rather than rebuilt per signature.
+    fn ring_vrf_verify_with(
+        verifier: &RingVerifier,
+        vrf_input_data: &[u8],
+        aux_data: &[u8],
+        signature: &[u8],
+    ) -> Result<[u8; 32], Error> {
         use ark_vrf::ring::Verifier as _;
 
         let signature = RingVrfSignature::deserialize_compressed_unchecked(signature)
@@ -141,13 +170,7 @@ impl Verifier {
         let input = vrf_input_point(vrf_input_data)?;
         let output = signature.output;
 
-        let ring_params = ring_proof_params(ring_size);
-
-        // The verifier key is reconstructed from the commitment and the constant
-        // verifier key component of the SRS in order to verify some proof.
-        let verifier_key = ring_params.verifier_key_from_commitment(commitment);
-        let verifier = ring_params.verifier(verifier_key);
-        if Public::verify(input, output, aux_data, &signature.proof, &verifier).is_err() {
+        if Public::verify(input, output, aux_data, &signature.proof, verifier).is_err() {
             return Err(Error::VerificationFailure);
         }
 
@@ -321,6 +344,13 @@ pub fn batch_verify_tickets_impl(
         }
     };
 
+    // Build the ring verifier once for the whole batch and reuse it for every
+    // ticket. Construction clones the full `PiopParams` (sized to the ring's
+    // domain, ~2048 for the full ring), so building it per ticket caused
+    // O(ring_size) allocation churn that scaled the memory use with the
+    // validator set and could exhaust memory on a full ring.
+    let verifier = build_ring_verifier(ring_size, commitment);
+
     tickets_data
         .chunks(chunk_size)
         .map(|chunk| {
@@ -331,13 +361,7 @@ pub fn batch_verify_tickets_impl(
             let signature = &chunk[0..RING_SIGNATURE_SIZE];
             let vrf_input_data = &chunk[RING_SIGNATURE_SIZE..];
 
-            Verifier::ring_vrf_verify(
-                ring_size,
-                commitment.clone(),
-                vrf_input_data,
-                &[],
-                signature,
-            )
+            Verifier::ring_vrf_verify_with(&verifier, vrf_input_data, &[], signature)
         })
         .collect()
 }
