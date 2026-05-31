@@ -1,6 +1,6 @@
 {
   "name": "@typeberry/native-workspace",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Native libraries for typeberry.",
   "workspaces": [
     "bandersnatch",
@@ -19,8 +19,8 @@
   "author": "Fluffy Labs",
   "license": "MPL-2.0",
   "optionalDependencies": {
-    "@typeberry/bandersnatch-native-darwin-arm64": "0.2.0",
-    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.2.0"
+    "@typeberry/bandersnatch-native-darwin-arm64": "0.3.0",
+    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.3.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.1.5",

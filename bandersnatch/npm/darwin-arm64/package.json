@@ -1,6 +1,6 @@
 {
   "name": "@typeberry/bandersnatch-native-darwin-arm64",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Native Node.js bindings for Bandersnatch VRF - darwin-arm64 platform",
   "main": "./bandersnatch.darwin-arm64.node",
   "os": ["darwin"],
