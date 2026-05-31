@@ -1,3 +1,4 @@
+import { createRequire } from 'module';
 
 export interface NativeBinding {
   ringCommitment: (keys: Uint8Array) => Uint8Array;
@@ -34,7 +35,6 @@ export interface NativeBinding {
 }
 
 export async function loadNativeBinding(): Promise<NativeBinding> {
-  const { createRequire } = await import('module');
   const require = createRequire(import.meta.url);
 
   // process is defined in env.d.ts but might be undefined in some envs. 
