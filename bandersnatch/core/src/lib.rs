@@ -107,7 +107,7 @@ pub const RING_SIGNATURE_SIZE: usize = 784;
 /// Deserialize a public key from bytes, returning the padding point on failure.
 pub fn deserialize_public_key(chunk: &[u8]) -> Public {
     Public::deserialize_compressed_unchecked(chunk)
-        .unwrap_or_else(|_| Public::from(RingProofParams::padding_point()))
+        .unwrap_or_else(|_| Public::from_affine(RingProofParams::padding_point()))
 }
 
 /// Extract VRF output hash from output.
