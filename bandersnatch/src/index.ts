@@ -235,6 +235,24 @@ export function batchGenerateRingVrf(
   );
 }
 
+/**
+ * Batch-verify ring VRF tickets against a single ring commitment.
+ *
+ * Verification is all-or-nothing: every ticket is aggregated into one batched
+ * pairing check, so the result reports a single pass/fail for the whole batch
+ * (an individual failing ticket cannot be identified).
+ *
+ * `ticketsData` is the concatenation of `signature (784 bytes) || vrfInput
+ * (vrfInputDataLen bytes)` per ticket. The returned buffer is:
+ *
+ * - On success: `[0x00, entropyHash_0 (32B), entropyHash_1 (32B), ...]` — the
+ *   status byte followed by one VRF output hash per ticket, in input order.
+ * - On failure: `[0x01, 0x00 * (numTickets * 32)]` — the status byte followed
+ *   by a zero-filled region of the same length; the hashes must be ignored.
+ *
+ * `numTickets` equals `ticketsData.length / (vrfInputDataLen + 784)`, so the
+ * response length is identical for success and failure.
+ */
 export function batchVerifyTickets(
   ringSize: number,
   commitment: Uint8Array,
