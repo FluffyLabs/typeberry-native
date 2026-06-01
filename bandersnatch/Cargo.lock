@@ -213,7 +213,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "bandersnatch-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ark-vrf",
  "getrandom",
@@ -222,7 +222,7 @@ dependencies = [
 
 [[package]]
 name = "bandersnatch-native"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bandersnatch-core",
  "napi",
@@ -232,7 +232,7 @@ dependencies = [
 
 [[package]]
 name = "bandersnatch-wasm"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bandersnatch-core",
  "getrandom",

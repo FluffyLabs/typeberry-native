@@ -326,44 +326,59 @@ pub fn batch_generate_ring_vrf_impl(
         .collect()
 }
 
-/// Batch verify multiple tickets.
+/// Batch verify multiple tickets against a single ring.
+///
+/// All tickets are aggregated into a single `ark_vrf::ring::BatchVerifier` and
+/// checked with one amortized pairing + MSM, instead of one pairing per ticket.
+/// Batch verification is inherently all-or-nothing: it yields a single pass/fail
+/// for the whole batch and cannot attribute a failure to a specific ticket.
+///
+/// On success the per-ticket VRF output hashes (entropy) are returned in input
+/// order. The call fails as a whole if the commitment or any signature is
+/// malformed, any VRF input point is invalid, or the batch check does not pass.
 pub fn batch_verify_tickets_impl(
     ring_size: RingSize,
     commitment_bytes: &[u8],
     tickets_data: &[u8],
     vrf_input_data_len: usize,
-) -> Vec<Result<[u8; 32], Error>> {
-    let chunk_size = vrf_input_data_len + RING_SIGNATURE_SIZE;
-    let commitment = match RingCommitment::deserialize_compressed_unchecked(commitment_bytes) {
-        Ok(c) => c,
-        Err(_) => {
-            return tickets_data
-                .chunks(chunk_size)
-                .map(|_| Err(Error::InvalidSignature))
-                .collect();
-        }
-    };
+) -> Result<Vec<[u8; 32]>, Error> {
+    use ark_vrf::ring::BatchVerifier;
 
-    // Build the ring verifier once for the whole batch and reuse it for every
-    // ticket. Construction clones the full `PiopParams` (sized to the ring's
-    // domain, ~2048 for the full ring), so building it per ticket caused
-    // O(ring_size) allocation churn that scaled the memory use with the
-    // validator set and could exhaust memory on a full ring.
+    let commitment = RingCommitment::deserialize_compressed_unchecked(commitment_bytes)
+        .map_err(|_| Error::InvalidSignature)?;
+
+    // Build the ring verifier once for the whole batch. Construction clones the
+    // full `PiopParams` (sized to the ring's domain, ~2048 for the full ring),
+    // so building it per ticket would cause O(ring_size) allocation churn that
+    // scales with the validator set and could exhaust memory on a full ring.
     let verifier = build_ring_verifier(ring_size, commitment);
+    let mut batch = BatchVerifier::new(verifier);
 
-    tickets_data
-        .chunks(chunk_size)
-        .map(|chunk| {
-            if chunk.len() < chunk_size {
-                return Err(Error::InvalidSignature);
-            }
+    let chunk_size = vrf_input_data_len + RING_SIGNATURE_SIZE;
+    let mut entropy = Vec::with_capacity(tickets_data.len() / chunk_size.max(1));
 
-            let signature = &chunk[0..RING_SIGNATURE_SIZE];
-            let vrf_input_data = &chunk[RING_SIGNATURE_SIZE..];
+    for chunk in tickets_data.chunks(chunk_size) {
+        if chunk.len() < chunk_size {
+            return Err(Error::InvalidSignature);
+        }
 
-            Verifier::ring_vrf_verify_with(&verifier, vrf_input_data, &[], signature)
-        })
-        .collect()
+        let signature_bytes = &chunk[0..RING_SIGNATURE_SIZE];
+        let vrf_input_data = &chunk[RING_SIGNATURE_SIZE..];
+
+        let signature = RingVrfSignature::deserialize_compressed_unchecked(signature_bytes)
+            .map_err(|_| Error::InvalidSignature)?;
+        let input = vrf_input_point(vrf_input_data)?;
+        let output = signature.output;
+
+        // The output hash is only trustworthy once the batch verifies; we record
+        // it here and return it only after `batch.verify()` succeeds below.
+        entropy.push(copy_vrf_output_hash(output));
+        batch.push(input, output, &[], &signature.proof);
+    }
+
+    batch.verify().map_err(|_| Error::VerificationFailure)?;
+
+    Ok(entropy)
 }
 
 pub mod ffi {
@@ -516,6 +531,19 @@ pub mod ffi {
         })
     }
 
+    /// Batch verify tickets and encode the result.
+    ///
+    /// Batch verification is all-or-nothing, so the response is a single status
+    /// byte followed by one 32-byte VRF output hash (entropy) per ticket:
+    ///
+    /// - `[RESULT_OK, entropy_0 (32B), entropy_1 (32B), ...]` when every ticket
+    ///   verifies.
+    /// - `[RESULT_ERR, 0u8; num_tickets * 32]` when the batch fails for any
+    ///   reason; the entropy region is zero-filled and must be ignored.
+    ///
+    /// `num_tickets` is derived from the input the same way the caller computes
+    /// it (`tickets_data.len() / (vrf_input_data_len + RING_SIGNATURE_SIZE)`),
+    /// so the response length is identical on success and failure.
     pub fn batch_verify_tickets(
         ring_size: u32,
         commitment: &[u8],
@@ -523,25 +551,28 @@ pub mod ffi {
         vrf_input_data_len: u32,
     ) -> Vec<u8> {
         let ring_size = RingSize::from_size(ring_size as usize);
-        let results = batch_verify_tickets_impl(
+        let chunk_size = vrf_input_data_len as usize + RING_SIGNATURE_SIZE;
+        let num_tickets = tickets_data.len() / chunk_size;
+
+        match batch_verify_tickets_impl(
             ring_size,
             commitment,
             tickets_data,
             vrf_input_data_len as usize,
-        );
-
-        results.into_iter().fold(Vec::new(), |mut acc, result| {
-            match result {
-                Ok(entropy) => {
-                    acc.push(RESULT_OK);
-                    acc.extend(entropy);
+        ) {
+            Ok(entropies) => {
+                let mut result = Vec::with_capacity(1 + entropies.len() * 32);
+                result.push(RESULT_OK);
+                for entropy in entropies {
+                    result.extend_from_slice(&entropy);
                 }
-                Err(_) => {
-                    acc.push(RESULT_ERR);
-                    acc.extend([0u8; 32]);
-                }
+                result
             }
-            acc
-        })
+            Err(_) => {
+                let mut result = vec![RESULT_ERR];
+                result.resize(1 + num_tickets * 32, 0);
+                result
+            }
+        }
     }
 }

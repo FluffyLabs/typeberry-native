@@ -256,14 +256,126 @@ mod tests {
             &commitment_bytes,
             &verify_data,
             input_len,
-        );
+        )
+        .expect("batch verification should succeed");
 
         assert_eq!(verify_results.len(), num_inputs as usize);
-        for (i, verify_result) in verify_results.iter().enumerate() {
-            let verified_hash = verify_result.as_ref().expect("verification should succeed");
+        for (i, verified_hash) in verify_results.iter().enumerate() {
             let vrf_input = &inputs_data[i * input_len..(i + 1) * input_len];
             let expected = compute_vrf_output_hash(&seeds[prover_index], vrf_input).unwrap();
             assert_eq!(*verified_hash, expected);
         }
+    }
+
+    /// Build a valid batch of `num_inputs` tickets for the tiny ring and return
+    /// `(commitment_bytes, verify_data, input_len)` ready for batch verification.
+    fn make_valid_batch(num_inputs: u32) -> (Vec<u8>, Vec<u8>, usize) {
+        let (seeds, public_keys) = make_ring(RingSize::Tiny.size());
+        let prover_index = 1;
+        let input_len = 36;
+
+        let mut inputs_data = Vec::new();
+        for attempt in 0..num_inputs {
+            inputs_data.extend_from_slice(&[0xCD; 32]);
+            inputs_data.extend_from_slice(&attempt.to_le_bytes());
+        }
+
+        let results = batch_generate_ring_vrf_impl(
+            &public_keys,
+            prover_index,
+            &seeds[prover_index],
+            &inputs_data,
+            input_len,
+        );
+
+        let commitment_bytes = compute_ring_commitment(&public_keys, RingSize::Tiny).unwrap();
+
+        let mut verify_data = Vec::new();
+        for (i, result) in results.iter().enumerate() {
+            let signature = result.as_ref().unwrap();
+            verify_data.extend_from_slice(signature);
+            verify_data.extend_from_slice(&inputs_data[i * input_len..(i + 1) * input_len]);
+        }
+
+        (commitment_bytes, verify_data, input_len)
+    }
+
+    #[test]
+    fn should_fail_whole_batch_when_one_ticket_is_invalid() {
+        let num_inputs = 3u32;
+        let (commitment_bytes, mut verify_data, input_len) = make_valid_batch(num_inputs);
+
+        // Tamper with the VRF input of the last ticket. The point is still a
+        // valid curve point (hash-to-curve), so this exercises the batch
+        // verification failure path rather than a deserialization error.
+        let last = verify_data.len() - 1;
+        verify_data[last] ^= 0xFF;
+
+        let result = crate::batch_verify_tickets_impl(
+            RingSize::Tiny,
+            &commitment_bytes,
+            &verify_data,
+            input_len,
+        );
+
+        // All-or-nothing: a single bad ticket fails the entire batch.
+        assert_eq!(result, Err(crate::Error::VerificationFailure));
+    }
+
+    #[test]
+    fn should_fail_batch_with_invalid_commitment() {
+        let (_commitment_bytes, verify_data, input_len) = make_valid_batch(2);
+        let bad_commitment = [0xAB; 16];
+
+        let result = crate::batch_verify_tickets_impl(
+            RingSize::Tiny,
+            &bad_commitment,
+            &verify_data,
+            input_len,
+        );
+
+        assert_eq!(result, Err(crate::Error::InvalidSignature));
+    }
+
+    #[test]
+    fn should_encode_batch_verify_ffi_wire_format() {
+        const RESULT_OK: u8 = 0;
+        const RESULT_ERR: u8 = 1;
+
+        let num_inputs = 3u32;
+        let (commitment_bytes, verify_data, input_len) = make_valid_batch(num_inputs);
+
+        // Success: status byte + one 32-byte entropy hash per ticket.
+        let ok = crate::ffi::batch_verify_tickets(
+            RingSize::Tiny.size() as u32,
+            &commitment_bytes,
+            &verify_data,
+            input_len as u32,
+        );
+        assert_eq!(ok[0], RESULT_OK);
+        assert_eq!(ok.len(), 1 + num_inputs as usize * 32);
+
+        // The encoded hashes must match the impl's returned entropy in order.
+        let expected = crate::batch_verify_tickets_impl(
+            RingSize::Tiny,
+            &commitment_bytes,
+            &verify_data,
+            input_len,
+        )
+        .unwrap();
+        for (i, hash) in expected.iter().enumerate() {
+            assert_eq!(&ok[1 + i * 32..1 + (i + 1) * 32], hash.as_slice());
+        }
+
+        // Failure: same length, status byte ERR, zero-filled entropy region.
+        let err = crate::ffi::batch_verify_tickets(
+            RingSize::Tiny.size() as u32,
+            &[0xAB; 16],
+            &verify_data,
+            input_len as u32,
+        );
+        assert_eq!(err[0], RESULT_ERR);
+        assert_eq!(err.len(), 1 + num_inputs as usize * 32);
+        assert!(err[1..].iter().all(|&b| b == 0));
     }
 }
