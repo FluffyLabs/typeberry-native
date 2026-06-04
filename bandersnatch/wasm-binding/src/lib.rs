@@ -51,6 +51,16 @@ pub fn vrf_output_hash(secret_seed: &[u8], input: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn generate_ring_vrf(
+    ring_keys: &[u8],
+    prover_key_index: u32,
+    secret_seed: &[u8],
+    vrf_input_data: &[u8],
+) -> Vec<u8> {
+    ffi::generate_ring_vrf(ring_keys, prover_key_index, secret_seed, vrf_input_data)
+}
+
+#[wasm_bindgen]
 pub fn batch_generate_ring_vrf(
     ring_keys: &[u8],
     prover_key_index: u32,
@@ -62,6 +72,25 @@ pub fn batch_generate_ring_vrf(
         ring_keys,
         prover_key_index,
         secret_seed,
+        inputs_data,
+        vrf_input_data_len,
+    )
+}
+
+#[wasm_bindgen]
+pub fn batch_generate_ring_vrf_for_validators(
+    ring_keys: &[u8],
+    prover_key_indices: &[u8],
+    secret_seeds_data: &[u8],
+    secret_seed_data_len: u32,
+    inputs_data: &[u8],
+    vrf_input_data_len: u32,
+) -> Vec<u8> {
+    ffi::batch_generate_ring_vrf_for_validators(
+        ring_keys,
+        prover_key_indices,
+        secret_seeds_data,
+        secret_seed_data_len,
         inputs_data,
         vrf_input_data_len,
     )

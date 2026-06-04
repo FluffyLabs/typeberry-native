@@ -1,9 +1,10 @@
 #[cfg(test)]
 mod tests {
     use crate::{
-        RingSize, batch_generate_ring_vrf_impl, compute_ring_commitment, compute_vrf_output_hash,
+        RING_SIGNATURE_SIZE, RingSize, batch_generate_ring_vrf_for_validators_impl,
+        batch_generate_ring_vrf_impl, compute_ring_commitment, compute_vrf_output_hash,
         derive_public_key_from_seed, deserialize_public_key, generate_ietf_seal,
-        verify_header_seals_impl, verify_seal_impl,
+        generate_ring_vrf_impl, verify_header_seals_impl, verify_seal_impl,
     };
 
     #[test]
@@ -265,6 +266,164 @@ mod tests {
             let expected = compute_vrf_output_hash(&seeds[prover_index], vrf_input).unwrap();
             assert_eq!(*verified_hash, expected);
         }
+    }
+
+    #[test]
+    fn should_generate_specific_ring_vrf_attempt() {
+        let (seeds, public_keys) = make_ring(RingSize::Tiny.size());
+        let prover_index = 1;
+        let input_len = 36;
+        let attempt = 7u32;
+
+        let mut vrf_input = Vec::new();
+        vrf_input.extend_from_slice(&[0xCD; 32]);
+        vrf_input.extend_from_slice(&attempt.to_le_bytes());
+
+        let signature =
+            generate_ring_vrf_impl(&public_keys, prover_index, &seeds[prover_index], &vrf_input)
+                .unwrap();
+
+        let commitment_bytes = compute_ring_commitment(&public_keys, RingSize::Tiny).unwrap();
+        let mut verify_data = Vec::new();
+        verify_data.extend_from_slice(&signature);
+        verify_data.extend_from_slice(&vrf_input);
+
+        let verify_results = crate::batch_verify_tickets_impl(
+            RingSize::Tiny,
+            &commitment_bytes,
+            &verify_data,
+            input_len,
+        )
+        .expect("single-attempt ticket should verify");
+
+        let expected = compute_vrf_output_hash(&seeds[prover_index], &vrf_input).unwrap();
+        assert_eq!(verify_results, vec![expected]);
+    }
+
+    #[test]
+    fn should_batch_generate_for_multiple_validators() {
+        let (seeds, public_keys) = make_ring(RingSize::Tiny.size());
+        let prover_indices = vec![1usize, 3usize];
+        let secret_seeds: Vec<&[u8]> = prover_indices
+            .iter()
+            .map(|&index| seeds[index].as_slice())
+            .collect();
+        let input_len = 36;
+        let num_inputs = 2u32;
+
+        let mut inputs_data = Vec::new();
+        for attempt in 0..num_inputs {
+            inputs_data.extend_from_slice(&[0xCD; 32]);
+            inputs_data.extend_from_slice(&attempt.to_le_bytes());
+        }
+
+        let results = batch_generate_ring_vrf_for_validators_impl(
+            &public_keys,
+            &prover_indices,
+            &secret_seeds,
+            &inputs_data,
+            input_len,
+        )
+        .unwrap();
+
+        assert_eq!(results.len(), prover_indices.len() * num_inputs as usize);
+
+        let commitment_bytes = compute_ring_commitment(&public_keys, RingSize::Tiny).unwrap();
+        let mut verify_data = Vec::new();
+        for validator_offset in 0..prover_indices.len() {
+            for input_offset in 0..num_inputs as usize {
+                let result_offset = validator_offset * num_inputs as usize + input_offset;
+                let signature = results[result_offset].as_ref().unwrap();
+                verify_data.extend_from_slice(signature);
+                verify_data.extend_from_slice(
+                    &inputs_data[input_offset * input_len..(input_offset + 1) * input_len],
+                );
+            }
+        }
+
+        let verify_results = crate::batch_verify_tickets_impl(
+            RingSize::Tiny,
+            &commitment_bytes,
+            &verify_data,
+            input_len,
+        )
+        .expect("multi-validator tickets should verify");
+
+        for (validator_offset, &prover_index) in prover_indices.iter().enumerate() {
+            for input_offset in 0..num_inputs as usize {
+                let result_offset = validator_offset * num_inputs as usize + input_offset;
+                let vrf_input =
+                    &inputs_data[input_offset * input_len..(input_offset + 1) * input_len];
+                let expected = compute_vrf_output_hash(&seeds[prover_index], vrf_input).unwrap();
+                assert_eq!(verify_results[result_offset], expected);
+            }
+        }
+    }
+
+    #[test]
+    fn should_encode_multi_validator_batch_generation_ffi_wire_format() {
+        const RESULT_OK: u8 = 0;
+
+        let (seeds, public_keys) = make_ring(RingSize::Tiny.size());
+        let prover_indices = [1u32, 3u32];
+        let input_len = 36;
+        let num_inputs = 2u32;
+
+        let mut ring_keys = Vec::new();
+        for seed in &seeds {
+            ring_keys.extend_from_slice(&derive_public_key_from_seed(seed).unwrap());
+        }
+
+        let mut prover_key_indices_data = Vec::new();
+        for index in prover_indices {
+            prover_key_indices_data.extend_from_slice(&index.to_le_bytes());
+        }
+
+        let mut secret_seeds_data = Vec::new();
+        secret_seeds_data.extend_from_slice(&seeds[1]);
+        secret_seeds_data.extend_from_slice(&seeds[3]);
+
+        let mut inputs_data = Vec::new();
+        for attempt in 0..num_inputs {
+            inputs_data.extend_from_slice(&[0xCD; 32]);
+            inputs_data.extend_from_slice(&attempt.to_le_bytes());
+        }
+
+        let encoded = crate::ffi::batch_generate_ring_vrf_for_validators(
+            &ring_keys,
+            &prover_key_indices_data,
+            &secret_seeds_data,
+            seeds[1].len() as u32,
+            &inputs_data,
+            input_len as u32,
+        );
+
+        assert_eq!(
+            encoded.len(),
+            prover_indices.len() * num_inputs as usize * (1 + RING_SIGNATURE_SIZE)
+        );
+        for record in encoded.chunks(1 + RING_SIGNATURE_SIZE) {
+            assert_eq!(record[0], RESULT_OK);
+            assert_ne!(&record[1..], &[0u8; RING_SIGNATURE_SIZE]);
+        }
+
+        let commitment_bytes = compute_ring_commitment(&public_keys, RingSize::Tiny).unwrap();
+        let mut verify_data = Vec::new();
+        for (record_index, record) in encoded.chunks(1 + RING_SIGNATURE_SIZE).enumerate() {
+            let input_offset = record_index % num_inputs as usize;
+            verify_data.extend_from_slice(&record[1..]);
+            verify_data.extend_from_slice(
+                &inputs_data[input_offset * input_len..(input_offset + 1) * input_len],
+            );
+        }
+
+        crate::batch_verify_tickets_impl(
+            RingSize::Tiny,
+            &commitment_bytes,
+            &verify_data,
+            input_len,
+        )
+        .expect("encoded multi-validator tickets should verify");
     }
 
     /// Build a valid batch of `num_inputs` tickets for the tiny ring and return

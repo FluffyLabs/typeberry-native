@@ -56,10 +56,24 @@ export type BandersnatchApi = {
   ) => Uint8Array;
   generateSeal: (secretSeed: Uint8Array, input: Uint8Array, auxData: Uint8Array) => Uint8Array;
   vrfOutputHash: (secretSeed: Uint8Array, input: Uint8Array) => Uint8Array;
+  generateRingVrf: (
+    ringKeys: Uint8Array,
+    proverKeyIndex: number,
+    secretSeed: Uint8Array,
+    vrfInputData: Uint8Array
+  ) => Uint8Array;
   batchGenerateRingVrf: (
     ringKeys: Uint8Array,
     proverKeyIndex: number,
     secretSeed: Uint8Array,
+    inputsData: Uint8Array,
+    vrfInputDataLen: number
+  ) => Uint8Array;
+  batchGenerateRingVrfForValidators: (
+    ringKeys: Uint8Array,
+    proverKeyIndices: Uint32Array | readonly number[],
+    secretSeedsData: Uint8Array,
+    secretSeedDataLen: number,
     inputsData: Uint8Array,
     vrfInputDataLen: number
   ) => Uint8Array;
@@ -80,7 +94,9 @@ function createApi(): BandersnatchApi {
     verifySeal,
     generateSeal,
     vrfOutputHash,
+    generateRingVrf,
     batchGenerateRingVrf,
+    batchGenerateRingVrfForValidators,
     batchVerifyTickets,
   };
 }
@@ -209,6 +225,26 @@ export function vrfOutputHash(secretSeed: Uint8Array, input: Uint8Array): Uint8A
   return wasmBinding!.vrf_output_hash(secretSeed, input);
 }
 
+/**
+ * Generate one ring VRF ticket for a concrete VRF input.
+ *
+ * This is the single-attempt form of `batchGenerateRingVrf`: callers encode the
+ * desired attempt into `vrfInputData` and receive one `status || signature`
+ * record, where the signature is 784 bytes.
+ */
+export function generateRingVrf(
+  ringKeys: Uint8Array,
+  proverKeyIndex: number,
+  secretSeed: Uint8Array,
+  vrfInputData: Uint8Array
+): Uint8Array {
+  assertInitialized();
+  if (nativeBinding) {
+    return nativeBinding.generateRingVrf(ringKeys, proverKeyIndex, secretSeed, vrfInputData);
+  }
+  return wasmBinding!.generate_ring_vrf(ringKeys, proverKeyIndex, secretSeed, vrfInputData);
+}
+
 export function batchGenerateRingVrf(
   ringKeys: Uint8Array,
   proverKeyIndex: number,
@@ -230,6 +266,62 @@ export function batchGenerateRingVrf(
     ringKeys,
     proverKeyIndex,
     secretSeed,
+    inputsData,
+    vrfInputDataLen
+  );
+}
+
+function encodeProverKeyIndices(indices: Uint32Array | readonly number[]): Uint8Array {
+  const result = new Uint8Array(indices.length * 4);
+  const view = new DataView(result.buffer, result.byteOffset, result.byteLength);
+
+  for (let i = 0; i < indices.length; i++) {
+    const index = indices[i];
+    if (!Number.isInteger(index) || index < 0 || index > 0xffffffff) {
+      throw new RangeError(`Invalid prover key index at position ${i}: ${index}`);
+    }
+    view.setUint32(i * 4, index, true);
+  }
+
+  return result;
+}
+
+/**
+ * Batch-generate ring VRF tickets for multiple validators.
+ *
+ * `secretSeedsData` is fixed-width concatenated seed data, split by
+ * `secretSeedDataLen`. `proverKeyIndices` and secret seeds must have the same
+ * count. The returned records are ordered validator-major, then input-major:
+ * `validator_0/input_0`, `validator_0/input_1`, ..., `validator_1/input_0`, ...
+ *
+ * Each record is `status byte || signature (784 bytes)`. If the validator
+ * metadata is malformed, the function returns a single error status byte.
+ */
+export function batchGenerateRingVrfForValidators(
+  ringKeys: Uint8Array,
+  proverKeyIndices: Uint32Array | readonly number[],
+  secretSeedsData: Uint8Array,
+  secretSeedDataLen: number,
+  inputsData: Uint8Array,
+  vrfInputDataLen: number
+): Uint8Array {
+  assertInitialized();
+  const proverKeyIndicesData = encodeProverKeyIndices(proverKeyIndices);
+  if (nativeBinding) {
+    return nativeBinding.batchGenerateRingVrfForValidators(
+      ringKeys,
+      proverKeyIndicesData,
+      secretSeedsData,
+      secretSeedDataLen,
+      inputsData,
+      vrfInputDataLen
+    );
+  }
+  return wasmBinding!.batch_generate_ring_vrf_for_validators(
+    ringKeys,
+    proverKeyIndicesData,
+    secretSeedsData,
+    secretSeedDataLen,
     inputsData,
     vrfInputDataLen
   );

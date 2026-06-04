@@ -59,6 +59,22 @@ pub fn vrf_output_hash(secret_seed: Buffer, input: Buffer) -> Buffer {
 }
 
 #[napi]
+pub fn generate_ring_vrf(
+    ring_keys: Buffer,
+    prover_key_index: u32,
+    secret_seed: Buffer,
+    vrf_input_data: Buffer,
+) -> Buffer {
+    ffi::generate_ring_vrf(
+        ring_keys.as_ref(),
+        prover_key_index,
+        secret_seed.as_ref(),
+        vrf_input_data.as_ref(),
+    )
+    .into()
+}
+
+#[napi]
 pub fn batch_generate_ring_vrf(
     ring_keys: Buffer,
     prover_key_index: u32,
@@ -70,6 +86,26 @@ pub fn batch_generate_ring_vrf(
         ring_keys.as_ref(),
         prover_key_index,
         secret_seed.as_ref(),
+        inputs_data.as_ref(),
+        vrf_input_data_len,
+    )
+    .into()
+}
+
+#[napi]
+pub fn batch_generate_ring_vrf_for_validators(
+    ring_keys: Buffer,
+    prover_key_indices: Buffer,
+    secret_seeds_data: Buffer,
+    secret_seed_data_len: u32,
+    inputs_data: Buffer,
+    vrf_input_data_len: u32,
+) -> Buffer {
+    ffi::batch_generate_ring_vrf_for_validators(
+        ring_keys.as_ref(),
+        prover_key_indices.as_ref(),
+        secret_seeds_data.as_ref(),
+        secret_seed_data_len,
         inputs_data.as_ref(),
         vrf_input_data_len,
     )
