@@ -8,7 +8,7 @@ use ark_vrf::reexports::ark_serialize::{self, CanonicalDeserialize, CanonicalSer
 use ark_vrf::suites::bandersnatch;
 use bandersnatch::{
     BandersnatchSha512Ell2, IetfProof, Input, Output, Public, RingProof, RingProofParams,
-    RingVerifier, Secret,
+    RingProver, RingVerifier, Secret,
 };
 
 #[cfg(test)]
@@ -290,6 +290,69 @@ pub fn verify_seal_impl(
     Verifier::ietf_vrf_verify(payload, aux_data, seal_data, public_key)
 }
 
+fn input_chunk_count(inputs_data: &[u8], vrf_input_data_len: usize) -> usize {
+    if vrf_input_data_len == 0 {
+        return 1;
+    }
+    inputs_data.len().div_ceil(vrf_input_data_len)
+}
+
+fn ring_vrf_error_results(count: usize, error: Error) -> Vec<Result<Vec<u8>, Error>> {
+    vec![Err(error); count]
+}
+
+fn generate_ring_vrf_signatures_with_prover(
+    secret: &Secret,
+    prover: &RingProver,
+    inputs_data: &[u8],
+    vrf_input_data_len: usize,
+) -> Vec<Result<Vec<u8>, Error>> {
+    if vrf_input_data_len == 0 {
+        return ring_vrf_error_results(1, Error::InvalidPointData);
+    }
+
+    inputs_data
+        .chunks(vrf_input_data_len)
+        .map(|vrf_input_data| {
+            if vrf_input_data.len() < vrf_input_data_len {
+                return Err(Error::InvalidPointData);
+            }
+
+            let input = vrf_input_point(vrf_input_data)?;
+            let output = secret.output(input);
+
+            let proof = ark_vrf::ring::Prover::prove(secret, input, output, &[], prover);
+
+            let sig = RingVrfSignature { output, proof };
+            let mut signature = Vec::new();
+            sig.serialize_compressed(&mut signature)
+                .map_err(|_| Error::InvalidSignature)?;
+            Ok(signature)
+        })
+        .collect()
+}
+
+/// Generate one anonymous ring VRF signature for a concrete input.
+///
+/// Callers that model ticket attempts in the input bytes can use this to
+/// generate an exact attempt, instead of generating the whole `0..X` range.
+pub fn generate_ring_vrf_impl(
+    ring_keys: &[Public],
+    prover_key_index: usize,
+    secret_seed: &[u8],
+    vrf_input_data: &[u8],
+) -> Result<Vec<u8>, Error> {
+    let mut results = batch_generate_ring_vrf_impl(
+        ring_keys,
+        prover_key_index,
+        secret_seed,
+        vrf_input_data,
+        vrf_input_data.len(),
+    );
+
+    results.pop().unwrap_or(Err(Error::InvalidPointData))
+}
+
 /// Batch generate anonymous ring VRF signatures.
 pub fn batch_generate_ring_vrf_impl(
     ring_keys: &[Public],
@@ -302,28 +365,72 @@ pub fn batch_generate_ring_vrf_impl(
     let secret = Secret::from_seed(secret_seed);
     let ring_params = ring_proof_params(ring_size);
     let pts: Vec<_> = ring_keys.iter().map(|pk| pk.0).collect();
+    let num_inputs = input_chunk_count(inputs_data, vrf_input_data_len);
 
-    inputs_data
-        .chunks(vrf_input_data_len)
-        .map(|vrf_input_data| {
-            if vrf_input_data.len() < vrf_input_data_len {
-                return Err(Error::InvalidPointData);
-            }
+    if prover_key_index >= ring_keys.len() {
+        return ring_vrf_error_results(num_inputs, Error::InvalidSignature);
+    }
 
-            let input = vrf_input_point(vrf_input_data)?;
-            let output = secret.output(input);
+    let prover_key = ring_params.prover_key(&pts);
+    let prover = ring_params.prover(prover_key, prover_key_index);
 
-            let prover_key = ring_params.prover_key(&pts);
-            let prover = ring_params.prover(prover_key, prover_key_index);
-            let proof = ark_vrf::ring::Prover::prove(&secret, input, output, &[], &prover);
+    generate_ring_vrf_signatures_with_prover(&secret, &prover, inputs_data, vrf_input_data_len)
+}
 
-            let sig = RingVrfSignature { output, proof };
-            let mut signature = Vec::new();
-            sig.serialize_compressed(&mut signature)
-                .map_err(|_| Error::InvalidSignature)?;
-            Ok(signature)
-        })
-        .collect()
+/// Batch generate anonymous ring VRF signatures for multiple validators.
+///
+/// Results are returned validator-major, then input-major:
+/// `validator_0/input_0`, `validator_0/input_1`, ..., `validator_1/input_0`, ...
+///
+/// This reuses the ring prover key across validators and reuses each validator's
+/// prover across all inputs, so it avoids the setup churn of calling
+/// [`batch_generate_ring_vrf_impl`] once per validator.
+pub fn batch_generate_ring_vrf_for_validators_impl(
+    ring_keys: &[Public],
+    prover_key_indices: &[usize],
+    secret_seeds: &[&[u8]],
+    inputs_data: &[u8],
+    vrf_input_data_len: usize,
+) -> Result<Vec<Result<Vec<u8>, Error>>, Error> {
+    if prover_key_indices.len() != secret_seeds.len() {
+        return Err(Error::InvalidSignature);
+    }
+
+    if prover_key_indices.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let num_inputs = input_chunk_count(inputs_data, vrf_input_data_len);
+    if ring_keys.is_empty() {
+        return Ok(ring_vrf_error_results(
+            prover_key_indices.len() * num_inputs,
+            Error::InvalidSignature,
+        ));
+    }
+
+    let ring_size = RingSize::from_size(ring_keys.len());
+    let ring_params = ring_proof_params(ring_size);
+    let pts: Vec<_> = ring_keys.iter().map(|pk| pk.0).collect();
+    let prover_key = ring_params.prover_key(&pts);
+
+    let mut results = Vec::with_capacity(prover_key_indices.len() * num_inputs);
+    for (&prover_key_index, secret_seed) in prover_key_indices.iter().zip(secret_seeds.iter()) {
+        if prover_key_index >= ring_keys.len() {
+            results.extend(ring_vrf_error_results(num_inputs, Error::InvalidSignature));
+            continue;
+        }
+
+        let secret = Secret::from_seed(secret_seed);
+        let prover = ring_params.prover(prover_key.clone(), prover_key_index);
+        results.extend(generate_ring_vrf_signatures_with_prover(
+            &secret,
+            &prover,
+            inputs_data,
+            vrf_input_data_len,
+        ));
+    }
+
+    Ok(results)
 }
 
 /// Batch verify multiple tickets against a single ring.
@@ -496,6 +603,56 @@ pub mod ffi {
         }
     }
 
+    fn encode_ring_vrf_generation_results(results: Vec<Result<Vec<u8>, Error>>) -> Vec<u8> {
+        results.into_iter().fold(Vec::new(), |mut acc, result| {
+            match result {
+                Ok(signature) => {
+                    acc.push(RESULT_OK);
+                    acc.extend_from_slice(&signature);
+                }
+                Err(_) => {
+                    acc.push(RESULT_ERR);
+                    acc.extend([0u8; RING_SIGNATURE_SIZE]);
+                }
+            }
+            acc
+        })
+    }
+
+    fn decode_prover_key_indices(prover_key_indices: &[u8]) -> Result<Vec<usize>, Error> {
+        if prover_key_indices.len() % 4 != 0 {
+            return Err(Error::InvalidSignature);
+        }
+
+        Ok(prover_key_indices
+            .chunks_exact(4)
+            .map(|chunk| {
+                u32::from_le_bytes(chunk.try_into().expect("chunk length checked")) as usize
+            })
+            .collect())
+    }
+
+    pub fn generate_ring_vrf(
+        ring_keys: &[u8],
+        prover_key_index: u32,
+        secret_seed: &[u8],
+        vrf_input_data: &[u8],
+    ) -> Vec<u8> {
+        let public_keys: Vec<_> = ring_keys
+            .chunks(PUBLIC_KEY_SIZE)
+            .map(deserialize_public_key)
+            .collect();
+
+        let result = generate_ring_vrf_impl(
+            &public_keys,
+            prover_key_index as usize,
+            secret_seed,
+            vrf_input_data,
+        );
+
+        encode_ring_vrf_generation_results(vec![result])
+    }
+
     pub fn batch_generate_ring_vrf(
         ring_keys: &[u8],
         prover_key_index: u32,
@@ -516,19 +673,49 @@ pub mod ffi {
             vrf_input_data_len as usize,
         );
 
-        results.into_iter().fold(Vec::new(), |mut acc, result| {
-            match result {
-                Ok(signature) => {
-                    acc.push(RESULT_OK);
-                    acc.extend_from_slice(&signature);
-                }
-                Err(_) => {
-                    acc.push(RESULT_ERR);
-                    acc.extend([0u8; RING_SIGNATURE_SIZE]);
-                }
-            }
-            acc
-        })
+        encode_ring_vrf_generation_results(results)
+    }
+
+    pub fn batch_generate_ring_vrf_for_validators(
+        ring_keys: &[u8],
+        prover_key_indices: &[u8],
+        secret_seeds_data: &[u8],
+        secret_seed_data_len: u32,
+        inputs_data: &[u8],
+        vrf_input_data_len: u32,
+    ) -> Vec<u8> {
+        let secret_seed_data_len = secret_seed_data_len as usize;
+        if secret_seed_data_len == 0 || secret_seeds_data.len() % secret_seed_data_len != 0 {
+            return vec![RESULT_ERR];
+        }
+
+        let prover_key_indices = match decode_prover_key_indices(prover_key_indices) {
+            Ok(indices) => indices,
+            Err(_) => return vec![RESULT_ERR],
+        };
+
+        let secret_seeds: Vec<_> = secret_seeds_data.chunks(secret_seed_data_len).collect();
+        if prover_key_indices.len() != secret_seeds.len() {
+            return vec![RESULT_ERR];
+        }
+
+        let public_keys: Vec<_> = ring_keys
+            .chunks(PUBLIC_KEY_SIZE)
+            .map(deserialize_public_key)
+            .collect();
+
+        let results = match batch_generate_ring_vrf_for_validators_impl(
+            &public_keys,
+            &prover_key_indices,
+            &secret_seeds,
+            inputs_data,
+            vrf_input_data_len as usize,
+        ) {
+            Ok(results) => results,
+            Err(_) => return vec![RESULT_ERR],
+        };
+
+        encode_ring_vrf_generation_results(results)
     }
 
     /// Batch verify tickets and encode the result.

@@ -19,10 +19,24 @@ export interface NativeBinding {
   ) => Uint8Array;
   generateSeal: (secretSeed: Uint8Array, input: Uint8Array, auxData: Uint8Array) => Uint8Array;
   vrfOutputHash: (secretSeed: Uint8Array, input: Uint8Array) => Uint8Array;
+  generateRingVrf: (
+    ringKeys: Uint8Array,
+    proverKeyIndex: number,
+    secretSeed: Uint8Array,
+    vrfInputData: Uint8Array
+  ) => Uint8Array;
   batchGenerateRingVrf: (
     ringKeys: Uint8Array,
     proverKeyIndex: number,
     secretSeed: Uint8Array,
+    inputsData: Uint8Array,
+    vrfInputDataLen: number
+  ) => Uint8Array;
+  batchGenerateRingVrfForValidators: (
+    ringKeys: Uint8Array,
+    proverKeyIndices: Uint8Array,
+    secretSeedsData: Uint8Array,
+    secretSeedDataLen: number,
     inputsData: Uint8Array,
     vrfInputDataLen: number
   ) => Uint8Array;
@@ -72,4 +86,3 @@ export async function loadNativeBinding(): Promise<NativeBinding> {
 
   return nativeBinding;
 }
-
