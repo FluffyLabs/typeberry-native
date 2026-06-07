@@ -78,5 +78,5 @@ jobs:
             echo
             echo "1. Merge \`release/v${{ steps.version.outputs.version }}\`."
             echo "2. The merge will create a draft \`v${{ steps.version.outputs.version }}\` release."
-            echo "3. Publish the draft release to publish npm version \`${{ steps.version.outputs.version }}-<short-sha>\`."
+            echo "3. Publish the draft release to publish npm version \`${{ steps.version.outputs.version }}\`."
           } >> "$GITHUB_STEP_SUMMARY"
