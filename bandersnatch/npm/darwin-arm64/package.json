@@ -1,10 +1,14 @@
 {
   "name": "@typeberry/bandersnatch-native-darwin-arm64",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Native Node.js bindings for Bandersnatch VRF - darwin-arm64 platform",
   "main": "./bandersnatch.darwin-arm64.node",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
   "author": "Fluffy Labs",
   "license": "MPL-2.0",
   "repository": {
