@@ -1,18 +1,43 @@
 name: Publish
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [ "main" ]
+  release:
+    types: [published]
+
+concurrency:
+  group: publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-wasm:
+  verify-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Verify release version
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          package_version=$(node -p "require('./package.json').version")
+
+          if [ "$tag" != "v$package_version" ]; then
+            echo "::error::Release tag $tag does not match package version v$package_version"
+            exit 1
+          fi
+
+  build-wasm:
+    needs: verify-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:
@@ -34,6 +59,7 @@ jobs:
             reed-solomon/pkg/
 
   build-native:
+    needs: verify-release
     strategy:
       fail-fast: false
       matrix:
@@ -50,6 +76,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:
@@ -68,13 +96,15 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [build-wasm, build-native]
+    needs: [verify-release, build-wasm, build-native]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:

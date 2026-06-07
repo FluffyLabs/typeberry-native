@@ -1,0 +1,82 @@
+name: Prepare release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump type
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Bump versions
+        id: version
+        run: |
+          version=$(node .github/scripts/bump-version.mjs "${{ inputs.bump }}")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Validate version files
+        run: |
+          cargo metadata \
+            --manifest-path bandersnatch/Cargo.toml \
+            --format-version 1 \
+            --locked \
+            --no-deps >/dev/null
+          node -e "JSON.parse(require('fs').readFileSync('package-lock.json'))"
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.PR_APP_ID }}
+          private-key: ${{ secrets.PR_APP_PRIVATE_KEY }}
+
+      - name: Create version bump pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          base: main
+          branch: release/v${{ steps.version.outputs.version }}
+          delete-branch: true
+          commit-message: "Bump version to ${{ steps.version.outputs.version }}"
+          title: "Bump version to ${{ steps.version.outputs.version }}"
+          body: |
+            Bumps the release version to `${{ steps.version.outputs.version }}`.
+
+            After merging this PR, a draft `v${{ steps.version.outputs.version }}` release will be created from the merged commit.
+
+      - name: Write summary
+        run: |
+          {
+            echo "## Version bump v${{ steps.version.outputs.version }} prepared"
+            echo
+            echo "1. Merge \`release/v${{ steps.version.outputs.version }}\`."
+            echo "2. The merge will create a draft \`v${{ steps.version.outputs.version }}\` release."
+            echo "3. Publish the draft release to publish npm version \`${{ steps.version.outputs.version }}-<short-sha>\`."
+          } >> "$GITHUB_STEP_SUMMARY"
