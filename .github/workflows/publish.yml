@@ -1,11 +1,13 @@
 name: Publish
 
 on:
+  push:
+    branches: [main]
   release:
     types: [published]
 
 concurrency:
-  group: publish-${{ github.event.release.tag_name }}
+  group: publish-${{ github.event_name }}-${{ github.event_name == 'release' && github.event.release.tag_name || github.sha }}
   cancel-in-progress: false
 
 permissions:
@@ -15,13 +17,14 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  verify-release:
+  verify-source:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.sha }}
       - name: Verify release version
+        if: github.event_name == 'release'
         run: |
           tag="${{ github.event.release.tag_name }}"
           package_version=$(node -p "require('./package.json').version")
@@ -32,12 +35,12 @@ jobs:
           fi
 
   build-wasm:
-    needs: verify-release
+    needs: verify-source
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.sha }}
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:
@@ -59,7 +62,7 @@ jobs:
             reed-solomon/pkg/
 
   build-native:
-    needs: verify-release
+    needs: verify-source
     strategy:
       fail-fast: false
       matrix:
@@ -77,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.sha }}
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:
@@ -96,7 +99,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [verify-release, build-wasm, build-native]
+    needs: [verify-source, build-wasm, build-native]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -104,7 +107,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.sha }}
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:
@@ -134,6 +137,49 @@ jobs:
 
       - name: Build native library bundle
         run: npm run build
+
+      - name: Get short commit SHA
+        if: github.event_name == 'push'
+        id: vars
+        run: echo "short_sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Append commit SHA to snapshot versions
+        if: github.event_name == 'push'
+        env:
+          SHORT_SHA: ${{ steps.vars.outputs.short_sha }}
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          const shortSha = process.env.SHORT_SHA;
+
+          const distPkg = JSON.parse(fs.readFileSync('dist/package.json'));
+          const baseVersion = distPkg.version;
+          const snapshotVersion = `${baseVersion}-${shortSha}`;
+          distPkg.version = snapshotVersion;
+
+          if (distPkg.optionalDependencies && typeof distPkg.optionalDependencies === 'object') {
+            for (const [dep, version] of Object.entries(distPkg.optionalDependencies)) {
+              if (version === baseVersion) {
+                distPkg.optionalDependencies[dep] = snapshotVersion;
+              }
+            }
+          }
+          fs.writeFileSync('dist/package.json', `${JSON.stringify(distPkg, null, 2)}\n`);
+
+          for (const pkgPath of [
+            'bandersnatch/npm/darwin-arm64/package.json',
+            'bandersnatch/npm/linux-x64-gnu/package.json'
+          ]) {
+            const pkg = JSON.parse(fs.readFileSync(pkgPath));
+            if (pkg.version !== baseVersion) {
+              throw new Error(
+                `${pkgPath} version ${pkg.version} does not match ${baseVersion}`,
+              );
+            }
+            pkg.version = snapshotVersion;
+            fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+          }
+          EOF
 
       - name: Publish platform packages
         run: |
