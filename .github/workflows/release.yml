@@ -69,7 +69,16 @@ jobs:
           body: |
             Bumps the release version to `${{ steps.version.outputs.version }}`.
 
-            After merging this PR, a draft `v${{ steps.version.outputs.version }}` release will be created from the merged commit.
+            A draft `v${{ steps.version.outputs.version }}` release has been created. Merge this PR before publishing it.
+
+      - name: Create draft GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          draft: true
+          prerelease: false
 
       - name: Write summary
         run: |
@@ -77,6 +86,5 @@ jobs:
             echo "## Version bump v${{ steps.version.outputs.version }} prepared"
             echo
             echo "1. Merge \`release/v${{ steps.version.outputs.version }}\`."
-            echo "2. The merge will create a draft \`v${{ steps.version.outputs.version }}\` release."
-            echo "3. Publish the draft release to publish npm version \`${{ steps.version.outputs.version }}\`."
+            echo "2. Publish the draft \`v${{ steps.version.outputs.version }}\` release to publish npm version \`${{ steps.version.outputs.version }}\`."
           } >> "$GITHUB_STEP_SUMMARY"
