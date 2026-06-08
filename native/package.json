@@ -1,6 +1,6 @@
 {
   "name": "@typeberry/native",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Native libraries for typeberry - bundles bandersnatch, ed25519 and reed-solomon with WASM and optional native bindings",
   "main": "./index.js",
   "types": "./index.d.ts",
@@ -23,8 +23,8 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "@typeberry/bandersnatch-native-darwin-arm64": "0.5.0",
-    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.5.0"
+    "@typeberry/bandersnatch-native-darwin-arm64": "0.5.1",
+    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.5.1"
   },
   "scripts": {
     "lint": "true",
