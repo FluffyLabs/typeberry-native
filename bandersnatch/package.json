@@ -1,6 +1,6 @@
 {
   "name": "@typeberry/bandersnatch",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Bandersnatch VRF library - auto-detects native bindings for Node.js with WASM fallback for browsers",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -35,8 +35,8 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "@typeberry/bandersnatch-native-darwin-arm64": "0.5.0",
-    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.5.0"
+    "@typeberry/bandersnatch-native-darwin-arm64": "0.5.1",
+    "@typeberry/bandersnatch-native-linux-x64-gnu": "0.5.1"
   },
   "devDependencies": {
     "typescript": "^5.6.3"
